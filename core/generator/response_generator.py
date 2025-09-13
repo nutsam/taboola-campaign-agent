@@ -26,7 +26,7 @@ class ResponseGenerator:
             prompt = SUGGESTION_FORMATTING_PROMPT_TEMPLATE.format(suggestions)
 
             response = openai.ChatCompletion.create(
-                model="gpt-4",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": prompt}
@@ -36,7 +36,7 @@ class ResponseGenerator:
             return response.choices[0].message['content']
         except Exception as e:
             error = ApiError(str(e), api_name="OpenAI", context={
-                "model": "gpt-4",
+                "model": "gpt-4o-mini",
                 "operation": "format_suggestions"
             })
             error_message = error_handler.handle_error(error)

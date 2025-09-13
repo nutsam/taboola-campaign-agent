@@ -87,6 +87,7 @@ class ConversationManager:
             if is_valid:
                 self.collected_inputs['budget'] = function_args.get('budget')
                 feedback = "Budget validated successfully. Please provide your target CPA."
+                logging.info(f"Budget validation passed: ${function_args.get('budget')}")
 
         elif function_name == 'process_cpa':
             is_valid, feedback = self.data_processor.validate_cpa(function_args.get('cpa'))

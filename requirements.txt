@@ -3,3 +3,6 @@ uvicorn
 pydantic
 openai
 python-dotenv
+streamlit>=1.28.0
+streamlit-chat>=0.1.1
+gradio>=3.50.0

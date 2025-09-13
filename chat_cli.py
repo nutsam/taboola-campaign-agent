@@ -3,12 +3,12 @@ from core.optimization_suggestion_engine.optimization_suggestion_engine import O
 from core.conversation_manager.conversation_manager import ConversationManager
 from core.migration_module.migration_module import MigrationModule
 from core.data_processor.data_processor import DataProcessor
+from core.generator.response_generator import ResponseGenerator
 from external.api_clients import (
     TaboolaHistoricalDataClient,
     FacebookApiClient,
     TaboolaApiClient
 )
-from response_generator.response_generator import ResponseGenerator
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
