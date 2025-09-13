@@ -9,8 +9,7 @@ from core.migration_module.migration_module import MigrationModule, MigrationRep
 
 # API client imports
 from external.api_clients import (
-    NlpApiClient,
-    HistoricalDataApiClient,
+    TaboolaHistoricalDataClient,
     FacebookApiClient,
     TaboolaApiClient
 )
@@ -32,8 +31,7 @@ app = FastAPI(
 logging.info("Initializing API clients and core modules...")
 
 # API Clients
-nlp_client = NlpApiClient()
-historical_data_client = HistoricalDataApiClient()
+historical_data_client = TaboolaHistoricalDataClient()
 taboola_client = TaboolaApiClient()
 facebook_client = FacebookApiClient()
 source_clients = {'facebook': facebook_client}
@@ -45,7 +43,7 @@ migration_module = MigrationModule(taboola_client=taboola_client, source_clients
 # NOTE: Storing conversation state in a global variable is not suitable for production.
 # In a real-world scenario, you would use a session management system with a
 # database or cache (like Redis) to store conversation history per user.
-conversation_manager = ConversationManager(suggestion_engine=suggestion_engine, nlp_client=nlp_client)
+conversation_manager = ConversationManager(suggestion_engine=suggestion_engine, migration_module=migration_module)
 
 logging.info("Initialization complete. Application is ready.")
 

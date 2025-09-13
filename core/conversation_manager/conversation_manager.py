@@ -1,92 +1,174 @@
 import logging
-from ..prompt_template import SYSTEM_PROMPT
+import os
+import openai
+import json
+from dotenv import load_dotenv
+from ..prompt_template import (
+    SYSTEM_PROMPT,
+    OPTIMIZATION_TASK_PROMPT,
+    MIGRATION_TASK_PROMPT,
+    SUGGESTION_FORMATTING_PROMPT_TEMPLATE
+)
 from ..optimization_suggestion_engine.optimization_suggestion_engine import OptimizationSuggestionEngine
-from external.api_clients import NlpApiClient
+
+load_dotenv()
 
 class ConversationManager:
     """
     Manages the conversation flow with the advertiser, using an LLM and a system prompt.
     """
 
-    def __init__(self, suggestion_engine: OptimizationSuggestionEngine, nlp_client: NlpApiClient):
+    def __init__(self, suggestion_engine: OptimizationSuggestionEngine, migration_module, task: str = 'optimization'):
         """
-        Initializes the Conversation Manager with dependency-injected clients.
+        Initializes the Conversation Manager.
         """
         self.suggestion_engine = suggestion_engine
-        self.nlp_client = nlp_client
+        self.migration_module = migration_module
+        
+        if task == 'optimization':
+            task_prompt = OPTIMIZATION_TASK_PROMPT
+        elif task == 'migration':
+            task_prompt = MIGRATION_TASK_PROMPT
+        else:
+            raise ValueError(f"Unknown task: {task}")
+
         self.conversation_history = [
-            {"role": "system", "content": SYSTEM_PROMPT}
+            {"role": "system", "content": SYSTEM_PROMPT + task_prompt}
         ]
-        self.collected_inputs = {}
-        logging.info("ConversationManager initialized with injected NLP client.")
+        
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        if not openai.api_key:
+            raise ValueError("OPENAI_API_KEY environment variable not set.")
+        logging.info(f"ConversationManager initialized for task: {task}")
+
+        self.functions = [
+            {
+                "name": "create_campaign_suggestions",
+                "description": "Gathers campaign details and creates optimization suggestions.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string",
+                            "description": "The landing page URL for the campaign."
+                        },
+                        "budget": {
+                            "type": "number",
+                            "description": "The daily budget for the campaign."
+                        },
+                        "cpa": {
+                            "type": "number",
+                            "description": "The target Cost Per Action (CPA) for the campaign."
+                        },
+                        "target_platform": {
+                            "type": "string",
+                            "description": "The platform to target (e.g., Desktop, Mobile, All)."
+                        }
+                    },
+                    "required": ["url", "budget", "cpa", "target_platform"]
+                }
+            },
+            {
+                "name": "migrate_campaign",
+                "description": "Migrates a campaign from a source platform to Taboola.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "source_platform": {
+                            "type": "string",
+                            "description": "The source platform of the campaign (e.g., facebook)."
+                        },
+                        "campaign_id": {
+                            "type": "string",
+                            "description": "The ID of the campaign to migrate."
+                        }
+                    },
+                    "required": ["source_platform", "campaign_id"]
+                }
+            }
+        ]
 
     def handle_message(self, user_message: str) -> str:
         """
-        Handles a new message from the user by parsing it and advancing the conversation state.
+        Handles a new message from the user by calling the LLM and managing conversation state.
         """
-        logging.info(f"\nUser message: '{user_message}'")
+        # logging.info(f"\nUser message: '{user_message}'")
         self.conversation_history.append({"role": "user", "content": user_message})
 
-        # Use the NLP client to understand the user's message
-        parsed_result = self.nlp_client.parse_intent_and_entities(user_message)
-        intent = parsed_result.get('intent')
-        entities = parsed_result.get('entities', {})
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4o-mini",
+                messages=self.conversation_history,
+                functions=self.functions,
+                function_call="auto",
+            )
+            response_message = response.choices[0].message
 
-        ai_response = ""
-        # This logic now uses the parsed intent to decide the next action.
-        if not self.collected_inputs.get('url'):
-            if intent == 'provide_url':
-                self.collected_inputs['url'] = entities.get('url', "[URL not parsed]")
-                ai_response = f"Thanks for the URL. What is your daily budget for this campaign?"
-            else:
-                ai_response = "Hello! To get started, what is the website or landing page you will be promoting?"
+            if response_message.get("function_call"):
+                function_name = response_message["function_call"]["name"]
+                if function_name == "create_campaign_suggestions":
+                    function_args = json.loads(response_message["function_call"]["arguments"])
+                    logging.info(f"Function call received: {function_name} with args {function_args}")
+                    
+                    suggestions = self.suggestion_engine.get_suggestions(function_args)
+                    suggestion_response = self._format_suggestions_with_llm(suggestions)
+                    
+                    self.conversation_history.append(response_message)
+                    self.conversation_history.append(
+                        {
+                            "role": "function",
+                            "name": function_name,
+                            "content": suggestion_response, 
+                        }
+                    )
+                    return suggestion_response
+                elif function_name == "migrate_campaign":
+                    function_args = json.loads(response_message["function_call"]["arguments"])
+                    logging.info(f"Function call received: {function_name} with args {function_args}")
+                    
+                    report = self.migration_module.migrate_campaign(
+                        source_platform=function_args.get("source_platform"),
+                        campaign_id=function_args.get("campaign_id")
+                    )
+                    
+                    report_str = f"Migration Report:\nSuccesses: {report.successes}\nWarnings: {report.warnings}\nFailures: {report.failures}"
+                    
+                    self.conversation_history.append(response_message)
+                    self.conversation_history.append(
+                        {
+                            "role": "function",
+                            "name": function_name,
+                            "content": report_str,
+                        }
+                    )
+                    return report_str
+            
+            ai_response = response_message["content"]
+            self.conversation_history.append({"role": "assistant", "content": ai_response})
+            return ai_response
 
-        elif not self.collected_inputs.get('budget'):
-            if intent == 'provide_budget':
-                self.collected_inputs['budget'] = entities.get('budget')
-                ai_response = "Got it. What is your target Cost Per Action, or CPA?"
-            else:
-                ai_response = "I didn't catch a budget number. Could you please provide the daily budget?"
-
-        elif not self.collected_inputs.get('cpa'):
-            if intent == 'provide_cpa':
-                self.collected_inputs['cpa'] = entities.get('cpa')
-                ai_response = "Perfect. And which platform are you targeting? (e.g., Desktop, Mobile, or All)"
-            else:
-                ai_response = "I didn't catch a CPA value. Could you please provide your target CPA?"
-
-        elif not self.collected_inputs.get('target_platform'):
-            if intent == 'provide_platform':
-                self.collected_inputs['target_platform'] = entities.get('platform', 'All')
-                confirmation_message = (f"Excellent. Here's what I have:\n" 
-                                    f"- URL: {self.collected_inputs['url']}\n" 
-                                    f"- Daily Budget: ${self.collected_inputs['budget']}\n" 
-                                    f"- Target CPA: ${self.collected_inputs['cpa']}\n" 
-                                    f"- Target Platform: {self.collected_inputs['target_platform']}\n" 
-                                    f"Is this all correct?")
-                logging.info(f"AI asks for confirmation: {confirmation_message}")
-                logging.info("User confirms: Yes, looks good.")
-                analysis_message = "Thank you. I'm now analyzing this against our database... this might take a moment."
-                logging.info(f"AI says: {analysis_message}")
-                suggestions = self.suggestion_engine.get_suggestions(self.collected_inputs)
-                ai_response = self._format_suggestions_with_llm(suggestions)
-            else:
-                ai_response = "I didn't catch a platform. Please specify if you are targeting Desktop, Mobile, or All."
-
-        else:
-            ai_response = "I've already provided the initial suggestions. Would you like to refine any parameters or start over?"
-
-        self.conversation_history.append({"role": "assistant", "content": ai_response})
-        return ai_response
+        except Exception as e:
+            logging.error(f"Error calling OpenAI API: {e}")
+            return "I'm sorry, I'm having trouble connecting to my brain right now. Please try again in a moment."
 
     def _format_suggestions_with_llm(self, suggestions: list[str]) -> str:
-        header = "I've analyzed the data, and here are a few suggestions based on top-performing campaigns in your domain:\n"
-        formatted_list = []
-        for suggestion in suggestions:
-            if "targeting" in suggestion:
-                formatted_list.append(f"**Targeting Recommendation:** {suggestion} We've seen that this specific demographic has a significantly higher conversion rate for similar products.")
-            elif "budget" in suggestion:
-                formatted_list.append(f"**Budget Recommendation:** {suggestion} Based on the data, this level of investment is more likely to give you the reach needed to hit your goals.")
-        if not formatted_list:
-            return "I've analyzed the data, but I couldn't find any specific recommendations based on the information provided."
-        return header + "\n- " + "\n- ".join(formatted_list)
+        """
+        Uses the LLM to format the suggestions into a natural, persuasive response.
+        """
+        prompt = SUGGESTION_FORMATTING_PROMPT_TEMPLATE.format(suggestions)
+
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.5,
+            )
+            formatted_suggestions = response.choices[0].message['content']
+        except Exception as e:
+            logging.error(f"Error calling OpenAI API for formatting: {e}")
+            formatted_suggestions = "I've gathered some suggestions for you, but I'm having trouble formatting them nicely. Here is the raw data:\n" + "\n".join(suggestions)
+
+        return formatted_suggestions

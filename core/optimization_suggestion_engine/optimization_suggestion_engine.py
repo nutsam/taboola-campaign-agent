@@ -29,11 +29,11 @@ class OptimizationSuggestionEngine:
             return ["Found similar campaigns, but none met the success criteria for generating reliable suggestions."]
         logging.info(f"   Identified {len(successful_campaigns)} successful campaigns to learn from.")
 
-        logging.info("4. Learning patterns from successful Taboola campaigns...")
+        logging.info("3. Learning patterns from successful Taboola campaigns...")
         learned_patterns = self._extract_patterns(successful_campaigns)
         logging.info(f"   Learned patterns: {learned_patterns}")
 
-        logging.info("5. Generating personalized suggestions...")
+        logging.info("4. Generating personalized suggestions...")
         suggestions = self._generate_suggestions(learned_patterns, user_campaign_data)
         logging.info("--- Suggestion Generation Complete ---")
 
