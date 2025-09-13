@@ -220,7 +220,7 @@ def main():
         # Display chat messages
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+                st.text(message["content"])
         
         # Chat input with Enter key support (no Send button needed!)
         if prompt := st.chat_input(
@@ -229,7 +229,7 @@ def main():
         ):
             # Display user message immediately
             with st.chat_message("user"):
-                st.markdown(prompt)
+                st.text(prompt)
             
             # Process the message
             handle_user_message(prompt)
@@ -240,7 +240,7 @@ def main():
                     if st.session_state.messages:
                         latest_message = st.session_state.messages[-1]
                         if latest_message["role"] == "assistant":
-                            st.markdown(latest_message["content"])
+                            st.text(latest_message["content"])
             
             st.rerun()
     
