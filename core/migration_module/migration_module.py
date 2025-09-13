@@ -4,6 +4,7 @@ import os
 from abc import ABC, abstractmethod
 from pydantic import ValidationError
 from external.api_clients import FacebookApiClient, TaboolaApiClient, ApiException
+from core.error_handler import ApiError
 from .schema_models import PlatformSchema
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -126,7 +127,20 @@ class FacebookAdapter(PlatformAdapter):
         logging.info("FacebookAdapter initialized.")
 
     def fetch_campaign_data(self, campaign_id: str) -> dict:
-        return self.api_client.get_campaign(campaign_id)
+        try:
+            return self.api_client.get_campaign(campaign_id)
+        except ApiError as e:
+            # Re-raise ApiError with additional context for migration
+            logging.error(f"Schema validation failed for Facebook campaign {campaign_id}: {e}")
+            raise ApiError(
+                f"Facebook campaign data validation failed: {e}",
+                api_name=e.api_name,
+                context={
+                    "original_error": str(e),
+                    "campaign_id": campaign_id,
+                    "migration_context": "FacebookAdapter.fetch_campaign_data"
+                }
+            )
 
 class TwitterAdapter(PlatformAdapter):
     """Adapter for migrating campaigns from Twitter."""
@@ -181,6 +195,15 @@ class MigrationModule:
 
             self._upload_to_taboola(taboola_data, report)
 
+        except ApiError as e:
+            # Handle schema validation and API errors from source platforms
+            if "schema validation" in str(e).lower():
+                report.add_failure(
+                    f"Campaign data from {source_platform} failed validation. Please check the source campaign configuration.",
+                    f"SchemaValidationError: {e}"
+                )
+            else:
+                report.add_failure(f"{source_platform} API error: {e}", e.__class__.__name__)
         except ApiException as e:
             report.add_failure(f"Taboola API returned an error: {e}", e.__class__.__name__)
         except Exception as e:
@@ -194,5 +217,7 @@ class MigrationModule:
         try:
             response = self.taboola_client.create_campaign(taboola_data)
             report.add_success(f"Campaign '{response.get('name')}' created in Taboola with ID '{response.get('id')}'.")
+        except ApiError as e:
+            report.add_failure(f"Failed to create campaign in Taboola: {e}", e.__class__.__name__)
         except ApiException as e:
             report.add_failure(f"Failed to create campaign in Taboola: {e}", e.__class__.__name__)

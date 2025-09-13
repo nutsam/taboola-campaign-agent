@@ -10,11 +10,6 @@ class ITaboolaApiClient(ABC):
     """
 
     @abstractmethod
-    def connect(self):
-        """Handles authentication and connection to the Taboola API."""
-        pass
-
-    @abstractmethod
     def create_campaign(self, campaign_data: dict) -> dict:
         """
         Creates a new campaign in Taboola.
@@ -36,11 +31,6 @@ class ITaboolaHistoricalDataClient(ABC):
     Defines the contract for a client that accesses Taboola's historical
     campaign data warehouse.
     """
-
-    @abstractmethod
-    def connect(self):
-        """Handles connection to the data warehouse."""
-        pass
 
     @abstractmethod
     def get_similar_campaigns(self, user_campaign_data: dict) -> list[dict]:

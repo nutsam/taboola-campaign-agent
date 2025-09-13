@@ -16,33 +16,75 @@ class ApiClient(ABC):
         logging.info(f"{self.__class__.__name__} initialized.")
 
     @abstractmethod
-    def connect(self):
+    def get_campaign(self, campaign_id: str) -> dict:
         pass
 
 # --- Third-Party API Clients ---
 
 class FacebookApiClient(ApiClient):
     """(Pseudo-code) Client for the Facebook Ads API."""
-    def connect(self):
-        logging.info("Connecting to Facebook Ads API...")
-        logging.info("   ...Connection successful.")
-
     def get_campaign(self, campaign_id: str) -> dict:
         logging.info(f"Facebook API: Fetching campaign {campaign_id}...")
-        return {
-            'name': 'My Awesome FB Campaign',
-            'objective': 'LINK_CLICKS',
-            'daily_budget': 20.00,
-            'targeting': {'geo': 'US', 'age_min': 25, 'interests': ['sports', 'finance']},
-            'creatives': [{'image_url': 'http://facebook.com/img.png', 'headline': 'My FB Ad'}]
-        }
+        
+        if campaign_id == "fb-001":
+            campaign_data = {
+                'name': 'My Awesome FB Campaign',
+                'objective': 'LINK_CLICKS',
+                'daily_budget': 20.00,
+                'targeting': {'geo': 'US', 'age_min': 25, 'interests': ['sports', 'finance']},
+                'creatives': [{'image_url': 'http://facebook.com/img.png', 'headline': 'My FB Ad'}]
+            }
+        else:
+            campaign_data = {
+                # 'name': 'My Awesome FB Campaign',  # Intentionally missing to trigger validation error
+                'objective': 'LINK_CLICKS',
+                'daily_budget': -3,  # Intentionally invalid to trigger validation error
+                'targeting': {'geo': 'US', 'age_min': 25, 'interests': ['sports', 'finance']},
+                'creatives': [{'image_url': 'http://facebook.com/img.png', 'headline': 'My FB Ad'}]
+            }
+        
+        # Validate campaign schema
+        self._validate_campaign_schema(campaign_data, campaign_id)
+        return campaign_data
+    
+    def _validate_campaign_schema(self, campaign_data: dict, campaign_id: str):
+        """Validate Facebook campaign data schema and raise clear errors if invalid."""
+        errors = []
+        
+        # Check for required fields
+        required_fields = ['name', 'objective', 'daily_budget', 'targeting', 'creatives']
+        for field in required_fields:
+            if field not in campaign_data:
+                errors.append(f"Missing required field: '{field}'")
+        
+        # Validate specific field values
+        if 'daily_budget' in campaign_data:
+            budget = campaign_data['daily_budget']
+            if not isinstance(budget, (int, float)) or budget <= 0:
+                errors.append(f"Invalid daily_budget: {budget}. Must be a positive number.")
+        
+        if 'name' in campaign_data:
+            name = campaign_data['name']
+            if not isinstance(name, str) or not name.strip():
+                errors.append(f"Invalid campaign name: '{name}'. Must be a non-empty string.")
+        
+        # If there are validation errors, raise a clear ApiError
+        if errors:
+            error_message = f"Facebook campaign {campaign_id} has schema validation errors: {'; '.join(errors)}"
+            error = ApiError(
+                error_message,
+                api_name="Facebook API",
+                context={
+                    "campaign_id": campaign_id,
+                    "validation_errors": errors,
+                    "campaign_data": campaign_data
+                }
+            )
+            error_handler.handle_error(error)
+            raise error
 
 class TwitterApiClient(ApiClient):
     """(Pseudo-code) Client for the Twitter Ads API."""
-    def connect(self):
-        logging.info("Connecting to Twitter Ads API...")
-        logging.info("   ...Connection successful.")
-
     def get_campaign(self, campaign_id: str) -> dict:
         logging.info(f"Twitter API: Fetching campaign {campaign_id}...")
         return {
@@ -54,32 +96,10 @@ class TwitterApiClient(ApiClient):
             ]
         }
 
-class NlpApiClient(ApiClient):
-    """(Pseudo-code) Client for an external NLP service."""
-    def connect(self):
-        logging.info("Connecting to NLP Service...")
-        logging.info("   ...Connection successful.")
-
-    def parse_intent_and_entities(self, user_message: str) -> dict:
-        if 'http' in user_message or '.com' in user_message:
-            return {'intent': 'provide_url', 'entities': {'url': 'http://my-new-tech-product.com'}}
-        elif 'budget' in user_message and any(char.isdigit() for char in user_message):
-            return {'intent': 'provide_budget', 'entities': {'budget': int(''.join(filter(str.isdigit, user_message)))}}
-        elif 'cpa' in user_message.lower() and any(char.isdigit() for char in user_message):
-            return {'intent': 'provide_cpa', 'entities': {'cpa': int(''.join(filter(str.isdigit, user_message)))}}
-        elif 'platform' in user_message.lower():
-            return {'intent': 'provide_platform', 'entities': {'platform': 'All'}}
-        else:
-            return {'intent': 'greeting', 'entities': {}}
-
 # --- Taboola API Mock Implementations ---
 
-class TaboolaApiClient(ITaboolaApiClient, ApiClient):
+class TaboolaApiClient(ITaboolaApiClient):
     """(Pseudo-code) Mock implementation of the Taboola API contract."""
-    def connect(self):
-        logging.info("Connecting to Taboola API...")
-        logging.info("   ...Connection successful.")
-
     def create_campaign(self, campaign_data: dict) -> dict:
         try:
             logging.info(f"Taboola API: Validating data for new campaign '{campaign_data.get('name')}'...")
@@ -115,12 +135,8 @@ class TaboolaApiClient(ITaboolaApiClient, ApiClient):
             error_handler.handle_error(error)
             raise error
 
-class TaboolaHistoricalDataClient(ITaboolaHistoricalDataClient, ApiClient):
+class TaboolaHistoricalDataClient(ITaboolaHistoricalDataClient):
     """(Pseudo-code) Mock implementation of the Taboola Historical Data contract."""
-    def connect(self):
-        logging.info("Connecting to Taboola Historical Campaign Data Warehouse...")
-        logging.info("   ...Connection successful.")
-
     def get_similar_campaigns(self, user_campaign_data: dict) -> list[dict]:
         category = "Tech"
         logging.info(f"Taboola Warehouse: Querying for successful campaigns in category '{category}'...")
