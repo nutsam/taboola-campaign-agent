@@ -1,5 +1,6 @@
 import logging
 import json
+import os
 from abc import ABC, abstractmethod
 from pydantic import ValidationError
 from external.api_clients import FacebookApiClient, TaboolaApiClient, ApiException
@@ -49,7 +50,8 @@ class PlatformAdapter(ABC):
 
     def _load_schema(self) -> PlatformSchema:
         """Loads and validates the platform-specific schema from a JSON file."""
-        schema_path = f'core/schemas/{self.platform_name}_schema.json'
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        schema_path = os.path.join(current_dir, 'schemas', f'{self.platform_name}_schema.json')
         logging.info(f"Loading schema from {schema_path}...")
         try:
             with open(schema_path, 'r') as f:
@@ -72,7 +74,7 @@ class PlatformAdapter(ABC):
     def _extract_tweet_creative_data(self, creatives):
         return [{'photo_url': c.get('media_url'), 'title': c.get('text')} for c in creatives or []]
 
-    def map_to_taboola(self, source_data: dict) -> tuple[dict, list]:
+    def map_to_taboola(self, source_data: dict, report: MigrationReport) -> tuple[dict, list]:
         """Maps source data to Taboola fields using the loaded schema."""
         logging.info(f"Mapping {self.__class__.__name__} fields to Taboola fields...")
         taboola_campaign = {}
@@ -108,6 +110,8 @@ class PlatformAdapter(ABC):
                 taboola_campaign[taboola_field] = value
             elif default_value is not None:
                 taboola_campaign[taboola_field] = default_value
+            else:
+                report.add_warning(f"No value or default found for required field '{taboola_field}'.")
 
             if warning:
                 warnings.append(warning)
@@ -163,7 +167,7 @@ class MigrationModule:
             source_data = adapter.fetch_campaign_data(campaign_id)
             report.add_success(f"Successfully fetched data for campaign '{campaign_id}'.")
             
-            taboola_data, warnings = adapter.map_to_taboola(source_data)
+            taboola_data, warnings = adapter.map_to_taboola(source_data, report)
             if data_override:
                 for key, value in data_override.items():
                     if value is None and key in taboola_data:
@@ -187,5 +191,8 @@ class MigrationModule:
 
     def _upload_to_taboola(self, taboola_data: dict, report: MigrationReport):
         """Uses the injected Taboola API client and adds result to the report."""
-        response = self.taboola_client.create_campaign(taboola_data)
-        report.add_success(f"Campaign '{response.get('name')}' created in Taboola with ID '{response.get('id')}'.")
+        try:
+            response = self.taboola_client.create_campaign(taboola_data)
+            report.add_success(f"Campaign '{response.get('name')}' created in Taboola with ID '{response.get('id')}'.")
+        except ApiException as e:
+            report.add_failure(f"Failed to create campaign in Taboola: {e}", e.__class__.__name__)

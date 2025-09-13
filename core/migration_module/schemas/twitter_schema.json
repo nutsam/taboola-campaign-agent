@@ -1,7 +1,6 @@
 {
     "name": {
-        "source_field": "name", 
-        "default": "Migrated Twitter Campaign",
+        "source_field": "name",
         "field_type": "string"
     },
     "daily_cap": {

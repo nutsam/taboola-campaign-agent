@@ -2,9 +2,9 @@ import logging
 import json
 
 # Core logic imports
-from core.optimization_suggestion_engine import OptimizationSuggestionEngine
-from core.conversation_manager import ConversationManager
-from core.migration_module import MigrationModule
+from core.optimization_suggestion_engine.optimization_suggestion_engine import OptimizationSuggestionEngine
+from core.conversation_manager.conversation_manager import ConversationManager
+from core.migration_module.migration_module import MigrationModule
 
 # API client imports
 from external.api_clients import (
