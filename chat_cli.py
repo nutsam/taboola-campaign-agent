@@ -9,11 +9,10 @@ from external.api_clients import (
     TaboolaApiClient
 )
 from response_generator.response_generator import ResponseGenerator
-from user_interface.chat_input import UserInterface
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class CliInterface(UserInterface):
+class CliInterface:
     """
     A command-line interface for interacting with the AI agent.
     """
