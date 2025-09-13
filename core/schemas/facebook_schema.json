@@ -1,23 +1,30 @@
 {
     "name": {
-      "source_field": "name",
-      "default": "Migrated Campaign"
+        "source_field": "name", 
+        "default": "Migrated Campaign",
+        "field_type": "string"
     },
     "daily_cap": {
-      "source_field": "daily_budget",
-      "default": 20
+        "source_field": "daily_budget", 
+        "default": 20.0,
+        "field_type": "float",
+        "transform": "divide_by_100"
     },
     "branding_text": {
-      "source_field": "name",
-      "default": "Your Brand",
-      "warning": "Used Facebook campaign name as 'branding_text'. Please review in Taboola."
+        "source_field": "name", 
+        "default": "Your Brand", 
+        "field_type": "string",
+        "warning": "Used Facebook campaign name as 'branding_text'. Please review in Taboola."
     },
     "cpc_bid": {
-      "default": 0.5,
-      "warning": "Set a default CPC bid of $0.50. Please adjust."
+        "default": 0.50, 
+        "field_type": "float",
+        "warning": "Set a default CPC bid of $0.50. Please adjust."
     },
     "creatives": {
-      "source_field": "creatives",
-      "default": []
+        "source_field": "creatives", 
+        "default": [],
+        "field_type": "string",
+        "transform": "extract_creative_data"
     }
-  }
+}

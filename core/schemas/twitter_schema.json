@@ -1,22 +1,28 @@
 {
     "name": {
-      "source_field": "name",
-      "default": "Migrated Twitter Campaign"
+        "source_field": "name", 
+        "default": "Migrated Twitter Campaign",
+        "field_type": "string"
     },
     "daily_cap": {
-      "source_field": "total_budget",
-      "default": 25
+        "source_field": "total_budget", 
+        "default": 25.0,
+        "field_type": "float"
     },
     "branding_text": {
-      "source_field": "account_name",
-      "default": "Your Brand"
+        "source_field": "account_name", 
+        "default": "Your Brand",
+        "field_type": "string"
     },
     "cpc_bid": {
-      "default": 0.6,
-      "warning": "Set a default CPC bid of $0.60 for Twitter. Please adjust."
+        "default": 0.60, 
+        "field_type": "float",
+        "warning": "Set a default CPC bid of $0.60 for Twitter. Please adjust."
     },
     "creatives": {
-      "source_field": "tweet_creatives",
-      "default": []
+        "source_field": "tweet_creatives", 
+        "default": [],
+        "field_type": "string",
+        "transform": "extract_tweet_creative_data"
     }
-  }
+}

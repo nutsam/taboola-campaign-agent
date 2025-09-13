@@ -41,6 +41,11 @@ class PlatformAdapter(ABC):
         self.api_client = api_client
         self.platform_name = platform_name
         self.schema = self._load_schema()
+        self.transformations = {
+            'divide_by_100': self._divide_by_100,
+            'extract_creative_data': self._extract_creative_data,
+            'extract_tweet_creative_data': self._extract_tweet_creative_data
+        }
 
     def _load_schema(self) -> PlatformSchema:
         """Loads and validates the platform-specific schema from a JSON file."""
@@ -58,6 +63,15 @@ class PlatformAdapter(ABC):
     def fetch_campaign_data(self, campaign_id: str) -> dict:
         pass
 
+    def _divide_by_100(self, value):
+        return value / 100 if value is not None else None
+
+    def _extract_creative_data(self, creatives):
+        return [{'photo_url': c.get('image_url'), 'title': c.get('headline')} for c in creatives or []]
+
+    def _extract_tweet_creative_data(self, creatives):
+        return [{'photo_url': c.get('media_url'), 'title': c.get('text')} for c in creatives or []]
+
     def map_to_taboola(self, source_data: dict) -> tuple[dict, list]:
         """Maps source data to Taboola fields using the loaded schema."""
         logging.info(f"Mapping {self.__class__.__name__} fields to Taboola fields...")
@@ -69,13 +83,28 @@ class PlatformAdapter(ABC):
         for taboola_field, mapping_rules in schema_dict.items():
             source_field = mapping_rules.get('source_field')
             default_value = mapping_rules.get('default')
+            field_type = mapping_rules.get('field_type', 'string')
+            transform_func_name = mapping_rules.get('transform')
             warning = mapping_rules.get('warning')
 
             value = None
             if source_field and source_field in source_data:
                 value = source_data[source_field]
+
+            if transform_func_name and transform_func_name in self.transformations:
+                value = self.transformations[transform_func_name](value)
             
             if value is not None:
+                try:
+                    if field_type == 'integer':
+                        value = int(value)
+                    elif field_type == 'float':
+                        value = float(value)
+                    elif field_type == 'boolean':
+                        value = bool(value)
+                except (ValueError, TypeError) as e:
+                    warnings.append(f"Could not cast {taboola_field} to {field_type}. Error: {e}")
+                    continue
                 taboola_campaign[taboola_field] = value
             elif default_value is not None:
                 taboola_campaign[taboola_field] = default_value
