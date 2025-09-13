@@ -8,7 +8,7 @@ The application exposes a REST API with two main endpoints:
 *   `/v1/chat`: A conversational endpoint for getting campaign optimization advice.
 *   `/v1/migrate`: An endpoint to programmatically migrate campaigns from platforms like Facebook to Taboola.
 
-The architecture is modular, with a clear separation of concerns between the API layer (`app.py`), core AI and business logic (`core/`), and external service integrations (`external_integrations/`).
+The architecture is modular, with a clear separation of concerns between the API layer (`app.py`), core AI and business logic (`core/`), and external service integrations (`external/`).
 
 ## Building and Running
 
@@ -29,7 +29,7 @@ The API will be available at `http://127.0.0.1:8000`. Interactive documentation 
 ## Development Conventions
 
 *   **Modular Design:** The codebase is organized into distinct modules, each with a specific responsibility (e.g., `optimization_suggestion_engine`, `migration_module`).
-*   **API Contracts:** The project uses abstract base classes in `external_integrations/taboola_api_contract.py` to define the interfaces for the Taboola APIs. The mock clients in `external_integrations/api_clients.py` implement these contracts.
+*   **API Contracts:** The project uses abstract base classes in `external/taboola_api_contract.py` to define the interfaces for the Taboola APIs. The mock clients in `external/api_clients.py` implement these contracts.
 *   **Adapter Pattern:** The `migration_module` uses the adapter pattern to handle campaign data from different source platforms. Each platform (e.g., Facebook, Twitter) has its own adapter that knows how to fetch and transform its data into a format compatible with Taboola.
 *   **Logging:** The application uses the `logging` module to provide detailed information about its execution, which is helpful for debugging and tracing the flow of requests.
 
@@ -40,6 +40,6 @@ The API will be available at `http://127.0.0.1:8000`. Interactive documentation 
     *   `optimization_suggestion_engine.py`: Analyzes user campaign data and provides optimization suggestions based on historical data from successful Taboola campaigns.
     *   `migration_module.py`: Orchestrates the process of migrating campaigns from a source platform to Taboola. It uses platform-specific adapters to handle the data mapping.
     *   `conversation_manager.py`: Manages the state of the conversation for the chat endpoint.
-*   **`external_integrations/`**: This directory contains the clients for interacting with external services.
+*   **`external/`**: This directory contains the clients for interacting with external services.
     *   `api_clients.py`: Contains mock implementations of API clients for Facebook, Twitter, a generic NLP service, and the Taboola API.
     *   `taboola_api_contract.py`: Defines the interfaces that the Taboola API clients must implement.

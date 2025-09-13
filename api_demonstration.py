@@ -7,7 +7,7 @@ from core.conversation_manager import ConversationManager
 from core.migration_module import MigrationModule
 
 # API client imports
-from external_integrations.api_clients import (
+from external.api_clients import (
     NlpApiClient,
     TaboolaHistoricalDataClient, # Updated client name
     FacebookApiClient,

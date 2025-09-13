@@ -2,7 +2,7 @@ import logging
 import json
 from abc import ABC, abstractmethod
 from pydantic import ValidationError
-from external_integrations.api_clients import FacebookApiClient, TaboolaApiClient, ApiException
+from external.api_clients import FacebookApiClient, TaboolaApiClient, ApiException
 from .schema_models import PlatformSchema
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

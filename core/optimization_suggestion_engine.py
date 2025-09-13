@@ -1,5 +1,5 @@
 import logging
-from external_integrations.api_clients import TaboolaHistoricalDataClient
+from external.api_clients import TaboolaHistoricalDataClient
 
 class OptimizationSuggestionEngine:
     """Analyzes input data against Taboola's historical campaign data to generate suggestions."""

@@ -1,7 +1,7 @@
 import logging
 from core.prompt_template import SYSTEM_PROMPT
 from core.optimization_suggestion_engine import OptimizationSuggestionEngine
-from external_integrations.api_clients import NlpApiClient
+from external.api_clients import NlpApiClient
 
 class ConversationManager:
     """
