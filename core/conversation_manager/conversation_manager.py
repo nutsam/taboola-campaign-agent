@@ -1,73 +1,195 @@
 import logging
 import os
-import openai
 import json
 from dotenv import load_dotenv
 from ..prompt_template import (
     SYSTEM_PROMPT,
     OPTIMIZATION_TASK_PROMPT,
-    MIGRATION_TASK_PROMPT,
-    SUGGESTION_FORMATTING_PROMPT_TEMPLATE
+    MIGRATION_TASK_PROMPT
 )
 from ..optimization_suggestion_engine.optimization_suggestion_engine import OptimizationSuggestionEngine
+from ..data_processor.data_processor import DataProcessor
 
 load_dotenv()
 
 class ConversationManager:
     """
-    Manages the conversation flow with the advertiser, using an LLM and a system prompt.
+    Manages the conversation flow for both optimization and migration tasks.
     """
 
-    def __init__(self, suggestion_engine: OptimizationSuggestionEngine, migration_module, task: str = 'optimization'):
+    def __init__(self, suggestion_engine: OptimizationSuggestionEngine, migration_module, data_processor: DataProcessor, response_generator, task: str):
         """
-        Initializes the Conversation Manager.
+        Initializes the Conversation Manager for a specific task.
         """
         self.suggestion_engine = suggestion_engine
         self.migration_module = migration_module
-        
+        self.data_processor = data_processor
+        self.response_generator = response_generator
+        self.task = task
+        self.collected_inputs = {}
+        self.current_step = "greeting"  # Track conversation state
+
         if task == 'optimization':
             task_prompt = OPTIMIZATION_TASK_PROMPT
+            self.functions = self._get_optimization_functions()
         elif task == 'migration':
             task_prompt = MIGRATION_TASK_PROMPT
+            self.functions = self._get_migration_functions()
         else:
             raise ValueError(f"Unknown task: {task}")
 
         self.conversation_history = [
             {"role": "system", "content": SYSTEM_PROMPT + task_prompt}
         ]
-        
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        if not openai.api_key:
-            raise ValueError("OPENAI_API_KEY environment variable not set.")
+
         logging.info(f"ConversationManager initialized for task: {task}")
 
-        self.functions = [
+    def handle_message(self, user_message: str) -> str:
+        """
+        Handles a new message from the user by calling the LLM and managing conversation state.
+        """
+        self.conversation_history.append({"role": "user", "content": user_message})
+
+        response_message = self.response_generator.get_response(self.conversation_history, self.functions)
+
+        if response_message.get("function_call"):
+            return self._process_function_call(response_message)
+
+        ai_response = response_message["content"]
+        self.conversation_history.append({"role": "assistant", "content": ai_response})
+        return ai_response
+
+    def _process_function_call(self, response_message):
+        function_name = response_message["function_call"]["name"]
+        function_args = json.loads(response_message["function_call"]["arguments"])
+        logging.info(f"Function call received: {function_name} with args {function_args}")
+
+        if function_name == 'process_url':
+            is_valid, feedback = self.data_processor.validate_url(function_args.get('url'))
+            if is_valid:
+                self.collected_inputs['url'] = function_args.get('url')
+                feedback = "URL validated successfully. Please provide your daily budget."
+            
+        elif function_name == 'process_budget':
+            is_valid, feedback = self.data_processor.validate_budget(function_args.get('budget'))
+            if is_valid:
+                self.collected_inputs['budget'] = function_args.get('budget')
+                feedback = "Budget validated successfully. Please provide your target CPA."
+
+        elif function_name == 'process_cpa':
+            is_valid, feedback = self.data_processor.validate_cpa(function_args.get('cpa'))
+            if is_valid:
+                self.collected_inputs['cpa'] = function_args.get('cpa')
+                feedback = "CPA validated successfully. Please provide your target platform."
+
+        elif function_name == 'process_platform':
+            is_valid, feedback = self.data_processor.validate_platform(function_args.get('platform'))
+            if is_valid:
+                self.collected_inputs['platform'] = function_args.get('platform')
+                feedback = "Platform validated successfully. All inputs collected. Ready to create suggestions."
+
+        elif function_name == "create_campaign_suggestions":
+            # All inputs should already be collected and validated
+            suggestions = self.suggestion_engine.get_suggestions(self.collected_inputs)
+            feedback = self.response_generator.format_suggestions(suggestions)
+
+        elif function_name == "migrate_campaign":
+            report = self.migration_module.migrate_campaign(
+                source_platform=function_args.get("source_platform"),
+                campaign_id=function_args.get("campaign_id")
+            )
+            feedback = self.response_generator.format_migration_report(report)
+
+        # Add function call and result to conversation history
+        self.conversation_history.append(response_message)
+        self.conversation_history.append({"role": "function", "name": function_name, "content": feedback})
+        
+        # Get AI response after function call
+        response = self.response_generator.get_response_after_function_call(self.conversation_history, response_message, function_name, feedback)
+        
+        # Add AI response to conversation history
+        self.conversation_history.append({"role": "assistant", "content": response})
+        
+        return response
+
+    
+
+    def _get_optimization_functions(self):
+        return [
             {
-                "name": "create_campaign_suggestions",
-                "description": "Gathers campaign details and creates optimization suggestions.",
+                "name": "process_url",
+                "description": "Processes the campaign URL provided by the user.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "url": {
                             "type": "string",
-                            "description": "The landing page URL for the campaign."
-                        },
-                        "budget": {
-                            "type": "number",
-                            "description": "The daily budget for the campaign."
-                        },
-                        "cpa": {
-                            "type": "number",
-                            "description": "The target Cost Per Action (CPA) for the campaign."
-                        },
-                        "target_platform": {
-                            "type": "string",
-                            "description": "The platform to target (e.g., Desktop, Mobile, All)."
+                            "description": "The campaign URL."
                         }
                     },
-                    "required": ["url", "budget", "cpa", "target_platform"]
+                    "required": ["url"]
                 }
             },
+            {
+                "name": "process_budget",
+                "description": "Processes the campaign budget provided by the user.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "budget": {
+                            "type": "number",
+                            "description": "The campaign budget."
+                        }
+                    },
+                    "required": ["budget"]
+                }
+            },
+            {
+                "name": "process_cpa",
+                "description": "Processes the target CPA provided by the user.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cpa": {
+                            "type": "number",
+                            "description": "The target CPA."
+                        }
+                    },
+                    "required": ["cpa"]
+                }
+            },
+            {
+                "name": "process_platform",
+                "description": "Processes the target platform provided by the user.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "platform": {
+                            "type": "string",
+                            "description": "The target platform (Desktop, Mobile, or Both)."
+                        }
+                    },
+                    "required": ["platform"]
+                }
+            },
+            {
+                "name": "create_campaign_suggestions",
+                "description": "Gathers all campaign details and creates optimization suggestions.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string"},
+                        "budget": {"type": "number"},
+                        "cpa": {"type": "number"},
+                        "platform": {"type": "string"}
+                    },
+                    "required": ["url", "budget", "cpa", "platform"]
+                }
+            }
+        ]
+
+    def _get_migration_functions(self):
+        return [
             {
                 "name": "migrate_campaign",
                 "description": "Migrates a campaign from a source platform to Taboola.",
@@ -87,88 +209,3 @@ class ConversationManager:
                 }
             }
         ]
-
-    def handle_message(self, user_message: str) -> str:
-        """
-        Handles a new message from the user by calling the LLM and managing conversation state.
-        """
-        # logging.info(f"\nUser message: '{user_message}'")
-        self.conversation_history.append({"role": "user", "content": user_message})
-
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-4o-mini",
-                messages=self.conversation_history,
-                functions=self.functions,
-                function_call="auto",
-            )
-            response_message = response.choices[0].message
-
-            if response_message.get("function_call"):
-                function_name = response_message["function_call"]["name"]
-                if function_name == "create_campaign_suggestions":
-                    function_args = json.loads(response_message["function_call"]["arguments"])
-                    logging.info(f"Function call received: {function_name} with args {function_args}")
-                    
-                    suggestions = self.suggestion_engine.get_suggestions(function_args)
-                    suggestion_response = self._format_suggestions_with_llm(suggestions)
-                    
-                    self.conversation_history.append(response_message)
-                    self.conversation_history.append(
-                        {
-                            "role": "function",
-                            "name": function_name,
-                            "content": suggestion_response, 
-                        }
-                    )
-                    return suggestion_response
-                elif function_name == "migrate_campaign":
-                    function_args = json.loads(response_message["function_call"]["arguments"])
-                    logging.info(f"Function call received: {function_name} with args {function_args}")
-                    
-                    report = self.migration_module.migrate_campaign(
-                        source_platform=function_args.get("source_platform"),
-                        campaign_id=function_args.get("campaign_id")
-                    )
-                    
-                    report_str = f"Migration Report:\nSuccesses: {report.successes}\nWarnings: {report.warnings}\nFailures: {report.failures}"
-                    
-                    self.conversation_history.append(response_message)
-                    self.conversation_history.append(
-                        {
-                            "role": "function",
-                            "name": function_name,
-                            "content": report_str,
-                        }
-                    )
-                    return report_str
-            
-            ai_response = response_message["content"]
-            self.conversation_history.append({"role": "assistant", "content": ai_response})
-            return ai_response
-
-        except Exception as e:
-            logging.error(f"Error calling OpenAI API: {e}")
-            return "I'm sorry, I'm having trouble connecting to my brain right now. Please try again in a moment."
-
-    def _format_suggestions_with_llm(self, suggestions: list[str]) -> str:
-        """
-        Uses the LLM to format the suggestions into a natural, persuasive response.
-        """
-        prompt = SUGGESTION_FORMATTING_PROMPT_TEMPLATE.format(suggestions)
-
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.5,
-            )
-            formatted_suggestions = response.choices[0].message['content']
-        except Exception as e:
-            logging.error(f"Error calling OpenAI API for formatting: {e}")
-            formatted_suggestions = "I've gathered some suggestions for you, but I'm having trouble formatting them nicely. Here is the raw data:\n" + "\n".join(suggestions)
-
-        return formatted_suggestions

@@ -110,3 +110,11 @@ class TaboolaHistoricalDataClient(ITaboolaHistoricalDataClient, ApiClient):
             {'id': 'tb_101', 'cpc_bid': 0.45, 'daily_cap': 100, 'targeting': {'platform': 'Mobile'}, 'roi': 1.3},
             {'id': 'tb_102', 'cpc_bid': 0.55, 'daily_cap': 150, 'targeting': {'platform': 'Desktop'}, 'roi': 1.8},
         ]
+
+    def get_budget_range(self) -> tuple[float, float]:
+        logging.info("Taboola Warehouse: Querying for budget range...")
+        return 50.0, 500.0
+
+    def get_cpa_range(self) -> tuple[float, float]:
+        logging.info("Taboola Warehouse: Querying for CPA range...")
+        return 2.0, 15.0

@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from core.optimization_suggestion_engine.optimization_suggestion_engine import OptimizationSuggestionEngine
 from core.conversation_manager.conversation_manager import ConversationManager
 from core.migration_module.migration_module import MigrationModule, MigrationReport
+from core.data_processor.data_processor import DataProcessor
+from response_generator.response_generator import ResponseGenerator
 
 # API client imports
 from external.api_clients import (
@@ -25,8 +27,6 @@ app = FastAPI(
 )
 
 # --- 2. Initialize all API Clients and Core Modules ---
-# In a real app, these would be managed more robustly (e.g., with a dependency injection framework).
-# For this demonstration, we'll create singleton instances here.
 
 logging.info("Initializing API clients and core modules...")
 
@@ -39,11 +39,20 @@ source_clients = {'facebook': facebook_client}
 # Core Modules
 suggestion_engine = OptimizationSuggestionEngine(historical_data_client=historical_data_client)
 migration_module = MigrationModule(taboola_client=taboola_client, source_clients=source_clients)
+data_processor = DataProcessor(historical_data_client=historical_data_client)
+response_generator = ResponseGenerator()
 
-# NOTE: Storing conversation state in a global variable is not suitable for production.
-# In a real-world scenario, you would use a session management system with a
-# database or cache (like Redis) to store conversation history per user.
-conversation_manager = ConversationManager(suggestion_engine=suggestion_engine, migration_module=migration_module)
+# NOTE: The /v1/chat endpoint is stateful and uses a single global conversation_manager instance.
+# This is for demonstration purposes only. In a production environment, you would need
+# a more robust session management system to handle concurrent conversations.
+# This instance is configured for the 'optimization' task.
+conversation_manager = ConversationManager(
+    suggestion_engine=suggestion_engine,
+    migration_module=migration_module, # Required for the combined ConversationManager
+    data_processor=data_processor,
+    response_generator=response_generator,
+    task='optimization'
+)
 
 logging.info("Initialization complete. Application is ready.")
 
@@ -69,8 +78,8 @@ class MigrationResponse(BaseModel):
 @app.post("/v1/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     """
-    Handles a user message in a conversation and returns the AI agent's response.
-    This endpoint is stateful for demonstration purposes.
+    Handles a user message in a conversation for campaign optimization.
+    This endpoint is stateful and for demonstration purposes.
     """
     logging.info(f"Received chat request: {request.user_message}")
     ai_response = conversation_manager.handle_message(request.user_message)
