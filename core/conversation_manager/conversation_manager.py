@@ -9,6 +9,7 @@ from ..prompt_template import (
 )
 from ..optimization_suggestion_engine.optimization_suggestion_engine import OptimizationSuggestionEngine
 from ..data_processor.data_processor import DataProcessor
+from ..error_handler import error_handler, ConversationError, ApiError
 
 load_dotenv()
 
@@ -27,7 +28,6 @@ class ConversationManager:
         self.response_generator = response_generator
         self.task = task
         self.collected_inputs = {}
-        self.current_step = "greeting"  # Track conversation state
 
         if task == 'optimization':
             task_prompt = OPTIMIZATION_TASK_PROMPT
@@ -48,16 +48,28 @@ class ConversationManager:
         """
         Handles a new message from the user by calling the LLM and managing conversation state.
         """
-        self.conversation_history.append({"role": "user", "content": user_message})
+        try:
+            if not user_message or not user_message.strip():
+                error = ConversationError("Empty message received", state=self.task)
+                return error_handler.handle_error(error)
+                
+            self.conversation_history.append({"role": "user", "content": user_message})
 
-        response_message = self.response_generator.get_response(self.conversation_history, self.functions)
+            response_message = self.response_generator.get_response(self.conversation_history, self.functions)
 
-        if response_message.get("function_call"):
-            return self._process_function_call(response_message)
+            if response_message.get("function_call"):
+                return self._process_function_call(response_message)
 
-        ai_response = response_message["content"]
-        self.conversation_history.append({"role": "assistant", "content": ai_response})
-        return ai_response
+            ai_response = response_message["content"]
+            self.conversation_history.append({"role": "assistant", "content": ai_response})
+            return ai_response
+            
+        except Exception as e:
+            return error_handler.handle_error(e, context={
+                "operation": "handle_message",
+                "task": self.task,
+                "message_length": len(user_message) if user_message else 0
+            })
 
     def _process_function_call(self, response_message):
         function_name = response_message["function_call"]["name"]

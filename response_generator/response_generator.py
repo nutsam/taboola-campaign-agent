@@ -3,6 +3,7 @@ import logging
 import os
 from dotenv import load_dotenv
 from core.prompt_template import SYSTEM_PROMPT, SUGGESTION_FORMATTING_PROMPT_TEMPLATE
+from core.error_handler import error_handler, ApiError, SystemError
 
 load_dotenv()
 
@@ -21,9 +22,9 @@ class ResponseGenerator:
         """
         Uses the LLM to format the suggestions into a natural, persuasive response.
         """
-        prompt = SUGGESTION_FORMATTING_PROMPT_TEMPLATE.format(suggestions)
-
         try:
+            prompt = SUGGESTION_FORMATTING_PROMPT_TEMPLATE.format(suggestions)
+
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
@@ -32,12 +33,16 @@ class ResponseGenerator:
                 ],
                 temperature=0.5,
             )
-            formatted_suggestions = response.choices[0].message['content']
+            return response.choices[0].message['content']
         except Exception as e:
-            logging.error(f"Error calling OpenAI API for formatting: {e}")
-            formatted_suggestions = "I've gathered some suggestions for you, but I'm having trouble formatting them nicely. Here is the raw data:\n" + "\n".join(suggestions)
-
-        return formatted_suggestions
+            error = ApiError(str(e), api_name="OpenAI", context={
+                "model": "gpt-4",
+                "operation": "format_suggestions"
+            })
+            error_message = error_handler.handle_error(error)
+            # Provide fallback with raw suggestions
+            fallback = "I've gathered some suggestions for you, but I'm having trouble formatting them nicely. Here is the raw data:\n" + "\n".join(suggestions)
+            return f"{error_message}\n\n{fallback}"
 
     def format_migration_report(self, report) -> str:
         """
@@ -55,21 +60,26 @@ class ResponseGenerator:
             )
             return response.choices[0].message
         except Exception as e:
-            logging.error(f"Error calling OpenAI API: {e}")
-            return {"content": "I'm sorry, I'm having trouble connecting to my brain right now. Please try again in a moment."}
+            error = ApiError(str(e), api_name="OpenAI", context={"model": "gpt-4o-mini"})
+            error_message = error_handler.handle_error(error)
+            return {"content": error_message}
 
     def get_response_after_function_call(self, conversation_history, response_message, function_name, content):
         """
         Calls the LLM with the result of a function call and returns the response.
         """
-        updated_history = conversation_history + [response_message, {"role": "function", "name": function_name, "content": content}]
-        
         try:
+            updated_history = conversation_history + [response_message, {"role": "function", "name": function_name, "content": content}]
+            
             response = openai.ChatCompletion.create(
                 model="gpt-4o-mini",
                 messages=updated_history,
             )
             return response.choices[0].message['content']
         except Exception as e:
-            logging.error(f"Error calling OpenAI API after function call: {e}")
-            return "I'm sorry, I'm having trouble processing the results. Please try again."
+            error = ApiError(str(e), api_name="OpenAI", context={
+                "model": "gpt-4o-mini",
+                "function_name": function_name,
+                "operation": "function_call_response"
+            })
+            return error_handler.handle_error(error)

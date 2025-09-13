@@ -3,6 +3,7 @@ import logging
 
 # Import the contracts that need to be implemented
 from .taboola_api_contract import ITaboolaApiClient, ITaboolaHistoricalDataClient
+from core.error_handler import error_handler, ApiError
 
 # Custom exception for mock API errors
 class ApiException(Exception):
@@ -80,22 +81,39 @@ class TaboolaApiClient(ITaboolaApiClient, ApiClient):
         logging.info("   ...Connection successful.")
 
     def create_campaign(self, campaign_data: dict) -> dict:
-        logging.info(f"Taboola API: Validating data for new campaign '{campaign_data.get('name')}'...")
-        required_fields = ['name', 'branding_text', 'cpc_bid', 'daily_cap']
-        missing_fields = [field for field in required_fields if not campaign_data.get(field)]
-        
-        if missing_fields:
-            raise ApiException(f"Cannot create campaign. Missing required fields: {missing_fields}")
+        try:
+            logging.info(f"Taboola API: Validating data for new campaign '{campaign_data.get('name')}'...")
+            required_fields = ['name', 'branding_text', 'cpc_bid', 'daily_cap']
+            missing_fields = [field for field in required_fields if not campaign_data.get(field)]
+            
+            if missing_fields:
+                error = ApiError(
+                    f"Cannot create campaign. Missing required fields: {missing_fields}",
+                    api_name="Taboola API",
+                    context={"missing_fields": missing_fields, "campaign_data": campaign_data}
+                )
+                raise error
 
-        logging.info("   ...Validation successful. Creating campaign.")
-        return {
-            'id': 'taboola_campaign_98765',
-            'name': campaign_data['name'],
-            'branding_text': campaign_data['branding_text'],
-            'cpc_bid': campaign_data['cpc_bid'],
-            'daily_cap': campaign_data['daily_cap'],
-            'status': 'PENDING_APPROVAL'
-        }
+            logging.info("   ...Validation successful. Creating campaign.")
+            return {
+                'id': 'taboola_campaign_98765',
+                'name': campaign_data['name'],
+                'branding_text': campaign_data['branding_text'],
+                'cpc_bid': campaign_data['cpc_bid'],
+                'daily_cap': campaign_data['daily_cap'],
+                'status': 'PENDING_APPROVAL'
+            }
+        except ApiError:
+            raise  # Re-raise our custom errors
+        except Exception as e:
+            # Convert unexpected errors to ApiError
+            error = ApiError(
+                f"Unexpected error creating campaign: {str(e)}",
+                api_name="Taboola API",
+                context={"campaign_data": campaign_data}
+            )
+            error_handler.handle_error(error)
+            raise error
 
 class TaboolaHistoricalDataClient(ITaboolaHistoricalDataClient, ApiClient):
     """(Pseudo-code) Mock implementation of the Taboola Historical Data contract."""

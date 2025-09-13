@@ -51,5 +51,36 @@ This is an AI-powered campaign assistant for Taboola advertising platform with t
 ### Environment Variables
 Ensure `.env` file contains OpenAI API key for the ResponseGenerator to function properly.
 
+## Error Handling System
+
+### Comprehensive Error Management
+The system includes a robust error handling framework that manages:
+
+- **Error Categorization**: Validation, API, Conversation, Data Processing, Migration, Optimization, and System errors
+- **Error Logging**: Dedicated logging to `campaign_assistant_errors.log` with structured context
+- **Error Recovery**: Automatic retry mechanisms and graceful fallback strategies
+- **User-Friendly Messages**: Context-aware error messages appropriate for end users
+
+### Error Types and Handling
+- **ValidationError**: Input validation failures (URL, budget, CPA, platform)
+- **ApiError**: External API failures (OpenAI, Taboola, Facebook)
+- **ConversationError**: Chat flow and state management issues
+- **DataProcessingError**: Data transformation and processing failures
+- **MigrationError**: Campaign migration failures
+- **OptimizationError**: Suggestion generation failures
+- **SystemError**: Critical system-level failures
+
+### Error Recovery Features
+- **Automatic Retry**: Configurable retry with exponential backoff for transient failures
+- **Fallback Mechanisms**: Alternative approaches when primary methods fail
+- **Input Suggestions**: Helpful suggestions for fixing validation errors
+- **Graceful Degradation**: Maintain basic functionality during partial system failures
+
+### Testing Error Handling
+```bash
+# Run comprehensive error handling tests
+python test_error_handling.py
+```
+
 ### Note on API Clients
 Current API clients are mock implementations for demonstration. Real integrations would require actual API credentials and endpoint implementations following the contracts in `taboola_api_contract.py`.
