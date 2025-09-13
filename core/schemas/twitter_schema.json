@@ -1,0 +1,22 @@
+{
+    "name": {
+      "source_field": "name",
+      "default": "Migrated Twitter Campaign"
+    },
+    "daily_cap": {
+      "source_field": "total_budget",
+      "default": 25
+    },
+    "branding_text": {
+      "source_field": "account_name",
+      "default": "Your Brand"
+    },
+    "cpc_bid": {
+      "default": 0.6,
+      "warning": "Set a default CPC bid of $0.60 for Twitter. Please adjust."
+    },
+    "creatives": {
+      "source_field": "tweet_creatives",
+      "default": []
+    }
+  }

@@ -8,7 +8,7 @@ The application exposes a REST API with two main endpoints:
 *   `/v1/chat`: A conversational endpoint for getting campaign optimization advice.
 *   `/v1/migrate`: An endpoint to programmatically migrate campaigns from platforms like Facebook to Taboola.
 
-The architecture is modular, with a clear separation of concerns between the API layer (`app.py`), core AI and business logic (`core_ai_logic/`), and external service integrations (`external_integrations/`).
+The architecture is modular, with a clear separation of concerns between the API layer (`app.py`), core AI and business logic (`core/`), and external service integrations (`external_integrations/`).
 
 ## Building and Running
 
@@ -36,7 +36,7 @@ The API will be available at `http://127.0.0.1:8000`. Interactive documentation 
 ## Key Modules
 
 *   **`app.py`**: The main entry point of the FastAPI application. It defines the API endpoints, initializes the core modules and API clients, and handles request/response models.
-*   **`core_ai_logic/`**: This directory contains the core business logic of the application.
+*   **`core/`**: This directory contains the core business logic of the application.
     *   `optimization_suggestion_engine.py`: Analyzes user campaign data and provides optimization suggestions based on historical data from successful Taboola campaigns.
     *   `migration_module.py`: Orchestrates the process of migrating campaigns from a source platform to Taboola. It uses platform-specific adapters to handle the data mapping.
     *   `conversation_manager.py`: Manages the state of the conversation for the chat endpoint.

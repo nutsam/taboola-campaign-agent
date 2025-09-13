@@ -1,0 +1,23 @@
+{
+    "name": {
+      "source_field": "name",
+      "default": "Migrated Campaign"
+    },
+    "daily_cap": {
+      "source_field": "daily_budget",
+      "default": 20
+    },
+    "branding_text": {
+      "source_field": "name",
+      "default": "Your Brand",
+      "warning": "Used Facebook campaign name as 'branding_text'. Please review in Taboola."
+    },
+    "cpc_bid": {
+      "default": 0.5,
+      "warning": "Set a default CPC bid of $0.50. Please adjust."
+    },
+    "creatives": {
+      "source_field": "creatives",
+      "default": []
+    }
+  }

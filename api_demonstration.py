@@ -2,9 +2,9 @@ import logging
 import json
 
 # Core logic imports
-from core_ai_logic.optimization_suggestion_engine import OptimizationSuggestionEngine
-from core_ai_logic.conversation_manager import ConversationManager
-from core_ai_logic.migration_module import MigrationModule
+from core.optimization_suggestion_engine import OptimizationSuggestionEngine
+from core.conversation_manager import ConversationManager
+from core.migration_module import MigrationModule
 
 # API client imports
 from external_integrations.api_clients import (
@@ -57,7 +57,6 @@ def run_demonstration():
         source_platform="facebook",
         campaign_id="fb_campaign_12345"
     )
-    logging.info(f"Final Report (Success): {report_success}")
 
     # Case 2: Failed Migration (due to missing data)
     logging.info("\n--- Case 2: Failed Migration (API Validation Error) ---")
@@ -68,7 +67,6 @@ def run_demonstration():
         campaign_id="fb_campaign_12345",
         data_override={'cpc_bid': None} # This will cause our mock API to fail
     )
-    logging.info(f"Final Report (Failure): {report_failure}")
 
 if __name__ == "__main__":
     run_demonstration()

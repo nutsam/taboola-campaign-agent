@@ -3,9 +3,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 # Core logic imports
-from core_ai_logic.optimization_suggestion_engine import OptimizationSuggestionEngine
-from core_ai_logic.conversation_manager import ConversationManager
-from core_ai_logic.migration_module import MigrationModule, MigrationReport
+from core.optimization_suggestion_engine import OptimizationSuggestionEngine
+from core.conversation_manager import ConversationManager
+from core.migration_module import MigrationModule, MigrationReport
 
 # API client imports
 from external_integrations.api_clients import (
