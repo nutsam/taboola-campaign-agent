@@ -212,8 +212,6 @@ def main():
             3. Provide campaign ID
             """)
         
-        # Tips
-        st.success("⚡ **Just press Enter to send** - No buttons needed!")
     
     # Main chat area
     if st.session_state.is_initialized:
