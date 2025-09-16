@@ -98,9 +98,7 @@ external/                # External API integrations
   - api_clients.py      # API client implementations
   - api_contracts.py    # Abstract API interfaces
 
-chat_cli.py             # Command-line interface
 streamlit_chat.py       # Web interface
-app.py                  # FastAPI application
 ```
 
 ### Adding New Platforms
@@ -111,10 +109,3 @@ To add support for a new advertising platform:
 2. Add schema mapping in `core/migration_module/schemas/`
 3. Implement platform-specific transformations
 4. Update the conversation manager to recognize the new platform
-
-## Contributing
-
-1. Follow the existing code structure and patterns
-2. Use dependency injection for testability
-3. Add appropriate error handling
-4. Update documentation for new features
