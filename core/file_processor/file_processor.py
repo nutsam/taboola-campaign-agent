@@ -6,7 +6,6 @@ from typing import Dict, List, Any, Union, Tuple
 from io import StringIO, BytesIO
 from core.error_handler import error_handler, ValidationError, DataProcessingError
 from .schema_validator import SchemaValidator, ValidationIssue
-from .llm_error_analyzer import LLMErrorAnalyzer
 
 class FileProcessor:
     """
@@ -18,8 +17,7 @@ class FileProcessor:
     
     def __init__(self):
         self.schema_validator = SchemaValidator()
-        self.llm_analyzer = LLMErrorAnalyzer()
-        logging.info("FileProcessor initialized with schema validator and LLM analyzer.")
+        logging.info("FileProcessor initialized with schema validator.")
     
     def process_uploaded_file(self, uploaded_file, file_format: str = None) -> List[Dict[str, Any]]:
         """
@@ -161,39 +159,42 @@ class FileProcessor:
                 original_error=e
             )
     
-    def validate_campaign_data(self, campaigns: List[Dict[str, Any]], platform: str) -> Tuple[List[Dict[str, Any]], str]:
+    def validate_campaign_data(self, campaigns: List[Dict[str, Any]], platform: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
-        Validate campaign data structure using dynamic schema comparison and LLM analysis.
+        Validate campaign data structure using dynamic schema comparison.
         
         Args:
             campaigns: List of campaign dictionaries
             platform: Source platform (facebook, twitter, etc.)
             
         Returns:
-            Tuple of (validated_campaigns, llm_analysis)
+            Tuple of (validated_campaigns, schema_comparison_data)
         """
         try:
-            # 使用動態 schema 驗證器
+            # Use dynamic schema validator
             validated_campaigns, validation_issues = self.schema_validator.validate_campaigns_against_schema(campaigns, platform)
             
             if not validation_issues:
-                # 沒有問題，返回成功消息
-                success_message = f"✅ All {len(validated_campaigns)} campaigns passed validation successfully!"
-                return validated_campaigns, success_message
+                # No issues, return success data
+                return validated_campaigns, {
+                    "has_issues": False,
+                    "success_message": f"✅ All {len(validated_campaigns)} campaigns passed validation successfully!"
+                }
             
-            # 生成 schema 比較摘要
+            # Generate schema comparison summary
             schema_comparison = self.schema_validator.generate_schema_comparison_summary(
                 campaigns, validation_issues, platform
             )
             
-            # 使用 LLM 分析問題並生成建議
-            llm_analysis = self.llm_analyzer.analyze_validation_issues(schema_comparison)
-            
             if not validated_campaigns:
                 raise ValidationError("No valid campaigns found in uploaded file")
                 
-            logging.info(f"Validation completed: {len(validated_campaigns)}/{len(campaigns)} campaigns valid, {len(validation_issues)} issues analyzed by LLM")
-            return validated_campaigns, llm_analysis
+            logging.info(f"Validation completed: {len(validated_campaigns)}/{len(campaigns)} campaigns valid, {len(validation_issues)} issues found")
+            
+            return validated_campaigns, {
+                "has_issues": True,
+                "schema_comparison": schema_comparison
+            }
             
         except Exception as e:
             if isinstance(e, ValidationError):

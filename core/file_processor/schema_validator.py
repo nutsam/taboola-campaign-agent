@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
@@ -14,7 +16,7 @@ class FieldType(Enum):
 
 @dataclass
 class FieldDefinition:
-    """定義單一字段的 schema"""
+    """Definition of a single field schema"""
     name: str
     field_type: FieldType
     required: bool = True
@@ -26,7 +28,7 @@ class FieldDefinition:
 
 @dataclass
 class ValidationIssue:
-    """驗證問題的詳細記錄"""
+    """Detailed record of validation issues"""
     campaign_index: int
     field_path: str
     issue_type: str
@@ -35,100 +37,60 @@ class ValidationIssue:
     description: str
 
 class PlatformSchema:
-    """平台特定的 schema 定義"""
+    """Platform-specific schema definition"""
     
     def __init__(self, platform: str):
         self.platform = platform
         self.fields = self._load_platform_schema()
     
     def _load_platform_schema(self) -> Dict[str, FieldDefinition]:
-        """載入平台特定的 schema 定義"""
-        if self.platform == 'facebook':
-            return {
-                'name': FieldDefinition(
-                    name='name',
-                    field_type=FieldType.STRING,
-                    required=True,
-                    description='Campaign name - must be a non-empty string'
-                ),
-                'objective': FieldDefinition(
-                    name='objective',
-                    field_type=FieldType.STRING,
-                    required=True,
-                    description='Campaign objective',
-                    allowed_values=['LINK_CLICKS', 'CONVERSIONS', 'REACH', 'BRAND_AWARENESS']
-                ),
-                'daily_budget': FieldDefinition(
-                    name='daily_budget',
-                    field_type=FieldType.NUMBER,
-                    required=True,
-                    description='Daily budget in USD',
-                    min_value=1.0,
-                    max_value=100000.0
-                ),
-                'targeting': FieldDefinition(
-                    name='targeting',
-                    field_type=FieldType.OBJECT,
-                    required=False,
-                    description='Targeting configuration object',
-                    nested_schema={
-                        'geo': FieldDefinition('geo', FieldType.STRING, False, 'Geographic targeting'),
-                        'age_min': FieldDefinition('age_min', FieldType.INTEGER, False, 'Minimum age', 13, 65),
-                        'age_max': FieldDefinition('age_max', FieldType.INTEGER, False, 'Maximum age', 18, 65),
-                        'interests': FieldDefinition('interests', FieldType.ARRAY, False, 'Interest targeting')
-                    }
-                ),
-                'creatives': FieldDefinition(
-                    name='creatives',
-                    field_type=FieldType.ARRAY,
-                    required=False,
-                    description='Creative assets array'
-                )
-            }
-        elif self.platform == 'twitter':
-            return {
-                'name': FieldDefinition(
-                    name='name',
-                    field_type=FieldType.STRING,
-                    required=True,
-                    description='Campaign name - must be a non-empty string'
-                ),
-                'total_budget': FieldDefinition(
-                    name='total_budget',
-                    field_type=FieldType.NUMBER,
-                    required=True,
-                    description='Total campaign budget in USD',
-                    min_value=1.0
-                ),
-                'account_name': FieldDefinition(
-                    name='account_name',
-                    field_type=FieldType.STRING,
-                    required=False,
-                    description='Twitter account name'
-                ),
-                'tweet_creatives': FieldDefinition(
-                    name='tweet_creatives',
-                    field_type=FieldType.ARRAY,
-                    required=False,
-                    description='Tweet creative content array'
-                )
-            }
-        else:
-            return {}
+        """Load platform-specific schema definition"""
+        schema_dir = Path(__file__).parent.parent / "migration_module" / "schemas"
+        schema_file = schema_dir / f"{self.platform}_validation_schema.json"
+        
+        with open(schema_file, 'r', encoding='utf-8') as f:
+            schema_data = json.load(f)
+        return self._parse_json_schema(schema_data)
+    
+    def _parse_json_schema(self, schema_data: Dict[str, Any]) -> Dict[str, FieldDefinition]:
+        """Parse JSON schema data into FieldDefinition objects"""
+        fields = {}
+        
+        for field_name, field_config in schema_data.items():
+            field_type = FieldType(field_config.get('field_type', 'string'))
+            
+            # Parse nested schema
+            nested_schema = None
+            if field_config.get('nested_schema'):
+                nested_schema = self._parse_json_schema(field_config['nested_schema'])
+            
+            fields[field_name] = FieldDefinition(
+                name=field_name,
+                field_type=field_type,
+                required=field_config.get('required', True),
+                description=field_config.get('description', ''),
+                min_value=field_config.get('min_value'),
+                max_value=field_config.get('max_value'),
+                allowed_values=field_config.get('allowed_values'),
+                nested_schema=nested_schema
+            )
+        
+        return fields
+    
 
 class SchemaValidator:
-    """動態 schema 驗證器"""
+    """Dynamic schema validator"""
     
     def __init__(self):
         logging.info("SchemaValidator initialized")
     
     def validate_campaigns_against_schema(self, campaigns: List[Dict[str, Any]], platform: str) -> Tuple[List[Dict[str, Any]], List[ValidationIssue]]:
         """
-        驗證活動數據與 schema 的符合性
+        Validate campaign data against schema compliance
         
         Args:
-            campaigns: 活動數據列表
-            platform: 平台名稱
+            campaigns: List of campaign data
+            platform: Platform name
             
         Returns:
             Tuple of (valid_campaigns, validation_issues)
@@ -149,10 +111,10 @@ class SchemaValidator:
         return valid_campaigns, all_issues
     
     def _validate_single_campaign(self, campaign: Dict[str, Any], schema: PlatformSchema, campaign_index: int) -> List[ValidationIssue]:
-        """驗證單一活動"""
+        """Validate single campaign"""
         issues = []
         
-        # 檢查必需字段
+        # Check required fields
         for field_name, field_def in schema.fields.items():
             if field_def.required and field_name not in campaign:
                 issues.append(ValidationIssue(
@@ -171,7 +133,7 @@ class SchemaValidator:
                 )
                 issues.extend(field_issues)
         
-        # 檢查額外字段 (不在 schema 中的字段)
+        # Check extra fields (fields not in schema)
         for field_name in campaign.keys():
             if field_name not in schema.fields:
                 issues.append(ValidationIssue(
@@ -186,10 +148,10 @@ class SchemaValidator:
         return issues
     
     def _validate_field_value(self, value: Any, field_def: FieldDefinition, campaign_index: int, field_path: str) -> List[ValidationIssue]:
-        """驗證字段值"""
+        """Validate field value"""
         issues = []
         
-        # 檢查數據類型
+        # Check data type
         if not self._check_type(value, field_def.field_type):
             issues.append(ValidationIssue(
                 campaign_index=campaign_index,
@@ -199,9 +161,9 @@ class SchemaValidator:
                 actual=f"{type(value).__name__}: {value}",
                 description=f"Expected {field_def.field_type.value}, got {type(value).__name__}"
             ))
-            return issues  # 如果類型錯誤，不進行進一步驗證
+            return issues  # If type error, don't proceed with further validation
         
-        # 檢查數值範圍
+        # Check numeric range
         if field_def.field_type in [FieldType.NUMBER, FieldType.INTEGER] and isinstance(value, (int, float)):
             if field_def.min_value is not None and value < field_def.min_value:
                 issues.append(ValidationIssue(
@@ -223,7 +185,7 @@ class SchemaValidator:
                     description=f"Value {value} exceeds maximum {field_def.max_value}"
                 ))
         
-        # 檢查允許的值
+        # Check allowed values
         if field_def.allowed_values and value not in field_def.allowed_values:
             issues.append(ValidationIssue(
                 campaign_index=campaign_index,
@@ -234,7 +196,7 @@ class SchemaValidator:
                 description=f"Value '{value}' not in allowed values: {field_def.allowed_values}"
             ))
         
-        # 檢查字符串是否為空
+        # Check if string is empty
         if field_def.field_type == FieldType.STRING and isinstance(value, str) and not value.strip():
             issues.append(ValidationIssue(
                 campaign_index=campaign_index,
@@ -245,7 +207,7 @@ class SchemaValidator:
                 description=f"Field '{field_path}' cannot be empty"
             ))
         
-        # 檢查嵌套對象
+        # Check nested objects
         if field_def.field_type == FieldType.OBJECT and field_def.nested_schema and isinstance(value, dict):
             for nested_field, nested_def in field_def.nested_schema.items():
                 if nested_field in value:
@@ -257,7 +219,7 @@ class SchemaValidator:
         return issues
     
     def _check_type(self, value: Any, expected_type: FieldType) -> bool:
-        """檢查值的類型是否符合預期"""
+        """Check if value type matches expected type"""
         if expected_type == FieldType.STRING:
             return isinstance(value, str)
         elif expected_type == FieldType.NUMBER:
@@ -274,10 +236,10 @@ class SchemaValidator:
     
     def generate_schema_comparison_summary(self, campaigns: List[Dict[str, Any]], issues: List[ValidationIssue], platform: str) -> Dict[str, Any]:
         """
-        生成 schema 比較摘要，用於 LLM 分析
+        Generate schema comparison summary for LLM analysis
         
         Returns:
-            包含詳細比較信息的字典
+            Dictionary containing detailed comparison information
         """
         schema = PlatformSchema(platform)
         
@@ -287,14 +249,14 @@ class SchemaValidator:
             "total_issues": len(issues),
             "expected_schema": self._serialize_schema(schema),
             "validation_issues": [self._serialize_issue(issue) for issue in issues],
-            "sample_data": campaigns[:3] if campaigns else [],  # 前3個活動作為樣本
+            "sample_data": campaigns[:3] if campaigns else [],  # First 3 campaigns as samples
             "issue_patterns": self._analyze_issue_patterns(issues)
         }
         
         return summary
     
     def _serialize_schema(self, schema: PlatformSchema) -> Dict[str, Any]:
-        """序列化 schema 定義"""
+        """Serialize schema definition"""
         serialized = {}
         for field_name, field_def in schema.fields.items():
             serialized[field_name] = {
@@ -311,10 +273,10 @@ class SchemaValidator:
         return serialized
     
     def _serialize_issue(self, issue: ValidationIssue) -> Dict[str, Any]:
-        """序列化驗證問題"""
+        """Serialize validation issue"""
         return {
-            "campaign_number": issue.campaign_index + 1,  # 從 1 開始編號給用戶看
-            "campaign_index": issue.campaign_index,  # 保留原始索引供程序使用
+            "campaign_number": issue.campaign_index + 1,  # Start numbering from 1 for user display
+            "campaign_index": issue.campaign_index,  # Keep original index for program use
             "field_path": issue.field_path,
             "issue_type": issue.issue_type,
             "expected": issue.expected,
@@ -323,7 +285,7 @@ class SchemaValidator:
         }
     
     def _analyze_issue_patterns(self, issues: List[ValidationIssue]) -> Dict[str, Any]:
-        """分析問題模式"""
+        """Analyze issue patterns"""
         patterns = {
             "most_common_issues": {},
             "affected_fields": {},
@@ -331,14 +293,14 @@ class SchemaValidator:
         }
         
         for issue in issues:
-            # 統計最常見的問題
+            # Count most common issues
             issue_key = f"{issue.field_path}:{issue.issue_type}"
             patterns["most_common_issues"][issue_key] = patterns["most_common_issues"].get(issue_key, 0) + 1
             
-            # 統計受影響的字段
+            # Count affected fields
             patterns["affected_fields"][issue.field_path] = patterns["affected_fields"].get(issue.field_path, 0) + 1
             
-            # 統計問題類型
+            # Count issue types
             patterns["issue_types"][issue.issue_type] = patterns["issue_types"].get(issue.issue_type, 0) + 1
         
         return patterns

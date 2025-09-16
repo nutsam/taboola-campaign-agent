@@ -1,0 +1,56 @@
+{
+    "name": {
+        "field_type": "string",
+        "required": true,
+        "description": "Campaign name - must be a non-empty string"
+    },
+    "objective": {
+        "field_type": "string",
+        "required": true,
+        "description": "Campaign objective",
+        "allowed_values": ["LINK_CLICKS", "CONVERSIONS", "REACH", "BRAND_AWARENESS"]
+    },
+    "daily_budget": {
+        "field_type": "number",
+        "required": true,
+        "description": "Daily budget in USD",
+        "min_value": 1.0,
+        "max_value": 100000.0
+    },
+    "targeting": {
+        "field_type": "object",
+        "required": false,
+        "description": "Targeting configuration object",
+        "nested_schema": {
+            "geo": {
+                "field_type": "string",
+                "required": false,
+                "description": "Geographic targeting"
+            },
+            "age_min": {
+                "field_type": "integer",
+                "required": false,
+                "description": "Minimum age",
+                "min_value": 13,
+                "max_value": 65
+            },
+            "age_max": {
+                "field_type": "integer",
+                "required": false,
+                "description": "Maximum age",
+                "min_value": 18,
+                "max_value": 65
+            },
+            "interests": {
+                "field_type": "array",
+                "required": false,
+                "description": "Interest targeting"
+            }
+        }
+    },
+    "creatives": {
+        "field_type": "array",
+        "required": false,
+        "description": "Creative assets array"
+    }
+}

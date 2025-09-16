@@ -1,0 +1,23 @@
+{
+    "name": {
+        "field_type": "string",
+        "required": true,
+        "description": "Campaign name - must be a non-empty string"
+    },
+    "total_budget": {
+        "field_type": "number",
+        "required": true,
+        "description": "Total campaign budget in USD",
+        "min_value": 1.0
+    },
+    "account_name": {
+        "field_type": "string",
+        "required": false,
+        "description": "Twitter account name"
+    },
+    "tweet_creatives": {
+        "field_type": "array",
+        "required": false,
+        "description": "Tweet creative content array"
+    }
+}

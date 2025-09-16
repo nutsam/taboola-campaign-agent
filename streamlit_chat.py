@@ -18,7 +18,6 @@ from core.conversation_manager.conversation_manager import ConversationManager
 from core.migration_module.migration_module import MigrationModule
 from core.data_processor.data_processor import DataProcessor
 from core.generator.response_generator import ResponseGenerator
-from core.file_processor import FileProcessor
 from external.api_clients import (
     TaboolaHistoricalDataClient,
     FacebookApiClient,
@@ -117,40 +116,24 @@ def handle_file_upload(uploaded_file, platform):
         with st.spinner('🔄 Processing uploaded file...'):
             logging.info(f"Processing uploaded file for platform: {platform}")
             
-            # Initialize file processor with LLM-powered validation
-            file_processor = FileProcessor()
+            # Use migration module to process file
+            migration_module = st.session_state.conversation_manager.migration_module
+            validated_data, validation_result = migration_module.process_uploaded_file(uploaded_file, platform)
             
-            # Process the uploaded file
-            campaign_data = file_processor.process_uploaded_file(uploaded_file)
+            # Use response generator to format the result
+            response_generator = st.session_state.conversation_manager.response_generator
+            file_upload_message = response_generator.format_file_processing_result(validated_data, validation_result, platform)
             
-            # Validate campaign data using new LLM-powered system
-            validated_data, llm_analysis = file_processor.validate_campaign_data(campaign_data, platform)
-            
-            # Build detailed message for AI agent
-            total_campaigns = len(campaign_data)
+            # Show status based on validation results
+            total_campaigns = len(validated_data) + (validation_result.get("total_issues", 0) // 2 if validation_result.get("has_issues") else 0)
             valid_campaigns = len(validated_data)
             failed_campaigns = total_campaigns - valid_campaigns
             
-            if failed_campaigns > 0:
+            if validation_result.get("has_issues"):
                 st.warning(f"⚠️ Processed {valid_campaigns}/{total_campaigns} campaigns successfully. {failed_campaigns} campaigns had validation errors.")
-                
-                # Create message for AI agent with LLM analysis
-                file_upload_message = f"""File processing completed with some issues:
-
-📊 **Summary:**
-- Total campaigns in file: {total_campaigns}
-- Successfully validated: {valid_campaigns}
-- Failed validation: {failed_campaigns}
-
-🤖 **AI Analysis:**
-{llm_analysis}
-
-✅ **Next Steps:**
-You can fix the errors based on the AI recommendations and re-upload, or proceed with migrating the {valid_campaigns} valid campaigns to Taboola."""
                 
             else:
                 st.success(f"✅ Successfully processed all {valid_campaigns} campaigns from file")
-                file_upload_message = f"Successfully uploaded and validated {valid_campaigns} {platform} campaigns from file. All campaigns passed validation and are ready for migration to Taboola."
             
             # Store file data in session state for later use
             if valid_campaigns > 0:
@@ -170,7 +153,7 @@ You can fix the errors based on the AI recommendations and re-upload, or proceed
             
             # Add migrate button only if there are valid campaigns
             if valid_campaigns > 0:
-                if st.button("🚀 Migrate All Campaigns", type="primary", use_container_width=True):
+                if st.button(f"🚀 Migrate {valid_campaigns} Valid Campaigns", type="primary", use_container_width=True):
                     handle_file_migration()
             
     except Exception as e:
@@ -180,7 +163,7 @@ You can fix the errors based on the AI recommendations and re-upload, or proceed
 
 
 def handle_file_migration():
-    """Handle migration of uploaded campaigns."""
+    """Handle UI flow for campaign migration."""
     if not st.session_state.conversation_manager:
         st.error("System not initialized. Please restart the application.")
         return
@@ -193,27 +176,26 @@ def handle_file_migration():
         with st.spinner('🔄 Migrating campaigns to Taboola...'):
             uploaded_campaigns = st.session_state.uploaded_campaigns
             
-            # Use the migration module directly
+            # Delegate to migration module
             migration_module = st.session_state.conversation_manager.migration_module
             report = migration_module.migrate_campaigns_from_file(
                 source_platform=uploaded_campaigns['platform'],
                 file_data=uploaded_campaigns['data']
             )
             
-            # Format and display results
+            # Format results through response generator
             response_generator = st.session_state.conversation_manager.response_generator
             migration_message = response_generator.format_migration_report(report)
             
-            # Add migration result to messages
+            # Update UI and conversation
             st.session_state.messages.append({
                 "role": "assistant", 
                 "content": f"File Migration Complete!\n\n{migration_message}"
             })
             
-            # Show summary
             st.success(f"✅ Migration completed! {len(report.successes)} successful, {len(report.failures)} failed")
             
-            # Clear uploaded campaigns
+            # Clean up session state
             del st.session_state.uploaded_campaigns
             
     except Exception as e:
@@ -311,9 +293,12 @@ def main():
             
             # Show sample format
             with st.expander("📄 Sample Format"):
-                file_processor = FileProcessor()
-                sample = file_processor.get_sample_format(selected_platform)
-                st.json(sample)
+                if st.session_state.conversation_manager:
+                    migration_module = st.session_state.conversation_manager.migration_module
+                    sample = migration_module.get_sample_format(selected_platform)
+                    st.json(sample)
+                else:
+                    st.info("Initialize the assistant to see sample format")
         
         st.divider()
         

@@ -2,10 +2,12 @@ import logging
 import json
 import os
 from abc import ABC, abstractmethod
+from typing import Dict, List, Any, Tuple
 from pydantic import ValidationError
 from external.api_clients import FacebookApiClient, TaboolaApiClient, ApiException
 from core.error_handler import ApiError
 from .schema_models import PlatformSchema
+from core.file_processor.file_processor import FileProcessor
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -190,7 +192,47 @@ class MigrationModule:
             'facebook': FacebookAdapter(source_clients.get('facebook')),
             'twitter': TwitterAdapter(source_clients.get('twitter'))
         }
-        logging.info("MigrationModule initialized with platform adapters.")
+        self.file_processor = FileProcessor()
+        logging.info("MigrationModule initialized with platform adapters and file processor.")
+
+    def process_uploaded_file(self, uploaded_file, platform: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Process uploaded file and validate campaign data.
+        
+        Args:
+            uploaded_file: Streamlit uploaded file object
+            platform: Source platform name (facebook, twitter, etc.)
+            
+        Returns:
+            Tuple of (validated_campaigns, validation_result)
+        """
+        try:
+            logging.info(f"Processing uploaded file for platform: {platform}")
+            
+            # Process the uploaded file
+            campaign_data = self.file_processor.process_uploaded_file(uploaded_file)
+            
+            # Validate campaign data using LLM-powered system
+            validated_data, validation_result = self.file_processor.validate_campaign_data(campaign_data, platform)
+            
+            logging.info(f"File processing completed: {len(validated_data)}/{len(campaign_data)} campaigns valid")
+            return validated_data, validation_result
+            
+        except Exception as e:
+            logging.error(f"Failed to process uploaded file: {str(e)}")
+            raise
+
+    def get_sample_format(self, platform: str) -> Dict[str, Any]:
+        """
+        Get sample campaign data format for a specific platform.
+        
+        Args:
+            platform: Platform name (facebook, twitter, etc.)
+            
+        Returns:
+            Dictionary with sample campaign structure
+        """
+        return self.file_processor.get_sample_format(platform)
 
     def migrate_campaigns_from_file(self, source_platform: str, file_data: list) -> MigrationReport:
         """
