@@ -112,6 +112,18 @@ class ConversationManager:
                 campaign_id=function_args.get("campaign_id")
             )
             feedback = self.response_generator.format_migration_report(report)
+            
+        elif function_name == "migrate_campaigns_from_file":
+            # Check if uploaded campaigns are available
+            uploaded_campaigns = function_args.get("uploaded_campaigns")
+            if uploaded_campaigns:
+                report = self.migration_module.migrate_campaigns_from_file(
+                    source_platform=uploaded_campaigns.get("platform"),
+                    file_data=uploaded_campaigns.get("data")
+                )
+                feedback = self.response_generator.format_migration_report(report)
+            else:
+                feedback = "No uploaded campaign data found. Please upload a file first."
 
         # Add function call and result to conversation history
         self.conversation_history.append(response_message)
@@ -219,6 +231,20 @@ class ConversationManager:
                         }
                     },
                     "required": ["source_platform", "campaign_id"]
+                }
+            },
+            {
+                "name": "migrate_campaigns_from_file",
+                "description": "Migrates multiple campaigns from uploaded file data to Taboola.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "uploaded_campaigns": {
+                            "type": "object",
+                            "description": "Uploaded campaign data containing platform and data arrays."
+                        }
+                    },
+                    "required": ["uploaded_campaigns"]
                 }
             }
         ]

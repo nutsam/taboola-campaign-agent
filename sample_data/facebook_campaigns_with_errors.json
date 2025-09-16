@@ -1,0 +1,65 @@
+[
+    {
+        "name": "Valid Campaign",
+        "objective": "LINK_CLICKS",
+        "daily_budget": 150.0,
+        "targeting": {
+            "geo": "US",
+            "age_min": 25,
+            "age_max": 45
+        },
+        "creatives": [
+            {
+                "image_url": "https://example.com/image.jpg",
+                "headline": "Valid Campaign Headline"
+            }
+        ]
+    },
+    {
+        "objective": "CONVERSIONS",
+        "daily_budget": 300.0,
+        "targeting": {
+            "geo": "US,CA"
+        },
+        "creatives": [
+            {
+                "image_url": "https://example.com/tech.jpg",
+                "headline": "Missing Name Campaign"
+            }
+        ]
+    },
+    {
+        "name": "Invalid Budget Campaign",
+        "objective": "LINK_CLICKS",
+        "daily_budget": -50.0,
+        "targeting": {
+            "geo": "US"
+        },
+        "creatives": [
+            {
+                "image_url": "https://example.com/holiday.jpg",
+                "headline": "Negative Budget Campaign"
+            }
+        ]
+    },
+    {
+        "name": "Missing Budget Campaign",
+        "objective": "INVALID_OBJECTIVE",
+        "targeting": {
+            "geo": "US",
+            "age_min": "twenty-five"
+        },
+        "creatives": [
+            {
+                "image_url": "https://example.com/missing.jpg",
+                "headline": "No Budget and Wrong Types"
+            }
+        ]
+    },
+    {
+        "name": "",
+        "objective": "LINK_CLICKS", 
+        "daily_budget": "one hundred",
+        "unknown_field": "this should not be here"
+    }
+]

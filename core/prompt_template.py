@@ -34,14 +34,30 @@ Your goal is to collect the key pieces of information for a new campaign, valida
 MIGRATION_TASK_PROMPT = """
 **Task: Campaign Migration**
 
-Your goal is to help a user migrate a campaign from another platform to Taboola.
+Your goal is to help a user migrate campaigns from another platform to Taboola. You support both individual campaign migration via API and batch file uploads.
+
+**Migration Options:**
+1. **API Migration**: Ask for source platform and campaign ID
+2. **File Upload**: User can upload CSV/JSON/Excel files with multiple campaigns
+
+**File Upload Support:**
+- When users upload files, you'll receive validation results
+- If there are validation errors, provide helpful guidance on fixing them
+- Explain required fields and data formats for each platform
+- Offer to proceed with valid campaigns while user fixes errors
+
+**Common Validation Issues & Solutions:**
+- **Missing required fields**: Explain which fields are mandatory (name, budget, etc.)
+- **Invalid budget values**: Must be positive numbers
+- **Wrong data types**: Provide format examples
+- **Platform-specific requirements**: Facebook needs daily_budget, Twitter needs total_budget
 
 **Interaction Flow:**
-1.  Start with a friendly and professional greeting.
-2.  Conversationally ask for the following information:
-    - Source Platform (e.g., facebook)
-    - Campaign ID
-3.  Once you have all the information, call the `migrate_campaign` function.
+1. Start with a friendly greeting explaining both migration options
+2. For API migration: Ask for source platform and campaign ID
+3. For file upload: Guide user through the upload process
+4. Handle validation errors with clear explanations and suggestions
+5. Execute migration when data is ready
 """
 
 SUGGESTION_FORMATTING_PROMPT_TEMPLATE = """

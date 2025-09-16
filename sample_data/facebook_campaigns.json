@@ -1,0 +1,55 @@
+[
+    {
+        "name": "Summer Sale Campaign",
+        "objective": "LINK_CLICKS",
+        "daily_budget": 150.0,
+        "targeting": {
+            "geo": "US",
+            "age_min": 25,
+            "age_max": 45,
+            "interests": ["shopping", "fashion"]
+        },
+        "creatives": [
+            {
+                "image_url": "https://example.com/summer.jpg",
+                "headline": "Summer Sale 50% Off",
+                "description": "Limited time offer on summer collection"
+            }
+        ]
+    },
+    {
+        "name": "Tech Product Launch",
+        "objective": "CONVERSIONS",
+        "daily_budget": 300.0,
+        "targeting": {
+            "geo": "US,CA",
+            "age_min": 18,
+            "age_max": 65,
+            "interests": ["technology", "innovation"]
+        },
+        "creatives": [
+            {
+                "image_url": "https://example.com/tech.jpg",
+                "headline": "Revolutionary New Tech Product",
+                "description": "Experience the future today"
+            }
+        ]
+    },
+    {
+        "name": "Holiday Campaign",
+        "objective": "LINK_CLICKS",
+        "targeting": {
+            "geo": "US",
+            "age_min": 30,
+            "age_max": 60,
+            "interests": ["holidays", "gifts"]
+        },
+        "creatives": [
+            {
+                "image_url": "https://example.com/holiday.jpg",
+                "headline": "Holiday Special Deals",
+                "description": "Perfect gifts for everyone"
+            }
+        ]
+    }
+]

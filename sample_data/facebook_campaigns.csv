@@ -1,0 +1,4 @@
+name,objective,daily_budget,targeting,creatives
+"Summer Sale Campaign",LINK_CLICKS,150.0,"{""geo"": ""US"", ""age_min"": 25, ""age_max"": 45}","[{""image_url"": ""https://example.com/summer.jpg"", ""headline"": ""Summer Sale 50% Off""}]"
+"Tech Product Launch",CONVERSIONS,300.0,"{""geo"": ""US,CA"", ""age_min"": 18, ""interests"": [""technology""]}","[{""image_url"": ""https://example.com/tech.jpg"", ""headline"": ""New Tech Product""}]"
+"Holiday Campaign",LINK_CLICKS,200.0,"{""geo"": ""US"", ""age_min"": 30}","[{""image_url"": ""https://example.com/holiday.jpg"", ""headline"": ""Holiday Special""}]"

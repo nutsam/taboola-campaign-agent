@@ -65,6 +65,18 @@ class PlatformAdapter(ABC):
     @abstractmethod
     def fetch_campaign_data(self, campaign_id: str) -> dict:
         pass
+    
+    def fetch_campaign_data_from_file(self, file_data: list) -> list:
+        """
+        Fetch campaign data from uploaded file.
+        
+        Args:
+            file_data: List of campaign dictionaries from file
+            
+        Returns:
+            List of campaign dictionaries
+        """
+        return file_data
 
     def _divide_by_100(self, value):
         return value / 100 if value is not None else None
@@ -141,6 +153,11 @@ class FacebookAdapter(PlatformAdapter):
                     "migration_context": "FacebookAdapter.fetch_campaign_data"
                 }
             )
+    
+    def fetch_campaign_data_from_file(self, file_data: list) -> list:
+        """Override to handle Facebook-specific file data processing."""
+        logging.info(f"Processing {len(file_data)} Facebook campaigns from file")
+        return file_data
 
 class TwitterAdapter(PlatformAdapter):
     """Adapter for migrating campaigns from Twitter."""
@@ -158,6 +175,11 @@ class TwitterAdapter(PlatformAdapter):
                 {'media_url': 'http://example.com/tweet_img.jpg', 'text': 'Check out our new product!'}
             ]
         }
+    
+    def fetch_campaign_data_from_file(self, file_data: list) -> list:
+        """Override to handle Twitter-specific file data processing."""
+        logging.info(f"Processing {len(file_data)} Twitter campaigns from file")
+        return file_data
 
 class MigrationModule:
     """Coordinates the campaign migration process from a source platform to Taboola."""
@@ -169,6 +191,52 @@ class MigrationModule:
             'twitter': TwitterAdapter(source_clients.get('twitter'))
         }
         logging.info("MigrationModule initialized with platform adapters.")
+
+    def migrate_campaigns_from_file(self, source_platform: str, file_data: list) -> MigrationReport:
+        """
+        Migrate multiple campaigns from uploaded file data.
+        
+        Args:
+            source_platform: Source platform name (facebook, twitter, etc.)
+            file_data: List of campaign dictionaries from uploaded file
+            
+        Returns:
+            MigrationReport with results for all campaigns
+        """
+        logging.info(f"\n--- Starting Batch Campaign Migration from {source_platform.capitalize()} ({len(file_data)} campaigns) ---")
+        report = MigrationReport()
+        adapter = self.adapters.get(source_platform.lower())
+        
+        if not adapter:
+            report.add_failure(f"Migration from '{source_platform}' is not supported.", "AdapterNotFound")
+            return report
+        
+        try:
+            # Process each campaign in the file
+            for i, campaign_data in enumerate(file_data):
+                campaign_name = campaign_data.get('name', f'Campaign_{i+1}')
+                
+                try:
+                    logging.info(f"Processing campaign {i+1}/{len(file_data)}: {campaign_name}")
+                    
+                    # Map campaign data to Taboola format
+                    taboola_data, warnings = adapter.map_to_taboola(campaign_data, report)
+                    
+                    for warning in warnings:
+                        report.add_warning(f"Campaign '{campaign_name}': {warning}")
+                    
+                    # Upload to Taboola
+                    self._upload_to_taboola(taboola_data, report)
+                    report.add_success(f"Successfully migrated campaign '{campaign_name}'")
+                    
+                except Exception as e:
+                    report.add_failure(f"Failed to migrate campaign '{campaign_name}': {str(e)}", e.__class__.__name__)
+                    
+        except Exception as e:
+            report.add_failure(f"Batch migration failed: {str(e)}", e.__class__.__name__)
+        
+        logging.info(f"--- Batch Migration Finished --- {report}")
+        return report
 
     def migrate_campaign(self, source_platform: str, campaign_id: str, data_override: dict = None) -> MigrationReport:
         logging.info(f"\n--- Starting Campaign Migration from {source_platform.capitalize()} for campaign ID '{campaign_id}' ---")

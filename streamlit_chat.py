@@ -18,6 +18,7 @@ from core.conversation_manager.conversation_manager import ConversationManager
 from core.migration_module.migration_module import MigrationModule
 from core.data_processor.data_processor import DataProcessor
 from core.generator.response_generator import ResponseGenerator
+from core.file_processor import FileProcessor
 from external.api_clients import (
     TaboolaHistoricalDataClient,
     FacebookApiClient,
@@ -106,6 +107,121 @@ def clean_message_content(message):
     return cleaned
 
 
+def handle_file_upload(uploaded_file, platform):
+    """Handle file upload and processing for migration."""
+    if not st.session_state.conversation_manager:
+        st.error("System not initialized. Please restart the application.")
+        return
+    
+    try:
+        with st.spinner('🔄 Processing uploaded file...'):
+            logging.info(f"Processing uploaded file for platform: {platform}")
+            
+            # Initialize file processor with LLM-powered validation
+            file_processor = FileProcessor()
+            
+            # Process the uploaded file
+            campaign_data = file_processor.process_uploaded_file(uploaded_file)
+            
+            # Validate campaign data using new LLM-powered system
+            validated_data, llm_analysis = file_processor.validate_campaign_data(campaign_data, platform)
+            
+            # Build detailed message for AI agent
+            total_campaigns = len(campaign_data)
+            valid_campaigns = len(validated_data)
+            failed_campaigns = total_campaigns - valid_campaigns
+            
+            if failed_campaigns > 0:
+                st.warning(f"⚠️ Processed {valid_campaigns}/{total_campaigns} campaigns successfully. {failed_campaigns} campaigns had validation errors.")
+                
+                # Create message for AI agent with LLM analysis
+                file_upload_message = f"""File processing completed with some issues:
+
+📊 **Summary:**
+- Total campaigns in file: {total_campaigns}
+- Successfully validated: {valid_campaigns}
+- Failed validation: {failed_campaigns}
+
+🤖 **AI Analysis:**
+{llm_analysis}
+
+✅ **Next Steps:**
+You can fix the errors based on the AI recommendations and re-upload, or proceed with migrating the {valid_campaigns} valid campaigns to Taboola."""
+                
+            else:
+                st.success(f"✅ Successfully processed all {valid_campaigns} campaigns from file")
+                file_upload_message = f"Successfully uploaded and validated {valid_campaigns} {platform} campaigns from file. All campaigns passed validation and are ready for migration to Taboola."
+            
+            # Store file data in session state for later use
+            if valid_campaigns > 0:
+                st.session_state.uploaded_campaigns = {
+                    'platform': platform,
+                    'data': validated_data
+                }
+                
+                # Show preview of valid data
+                with st.expander(f"📊 Preview ({valid_campaigns} valid campaigns)"):
+                    st.dataframe(validated_data[:5])  # Show first 5 campaigns
+                    if len(validated_data) > 5:
+                        st.info(f"Showing first 5 of {len(validated_data)} campaigns")
+            
+            # Add detailed message to conversation
+            st.session_state.messages.append({"role": "assistant", "content": file_upload_message})
+            
+            # Add migrate button only if there are valid campaigns
+            if valid_campaigns > 0:
+                if st.button("🚀 Migrate All Campaigns", type="primary", use_container_width=True):
+                    handle_file_migration()
+            
+    except Exception as e:
+        error_msg = f"Failed to process file: {str(e)}"
+        logging.error(error_msg)
+        st.error(error_msg)
+
+
+def handle_file_migration():
+    """Handle migration of uploaded campaigns."""
+    if not st.session_state.conversation_manager:
+        st.error("System not initialized. Please restart the application.")
+        return
+    
+    if 'uploaded_campaigns' not in st.session_state:
+        st.error("No uploaded campaigns found. Please upload a file first.")
+        return
+    
+    try:
+        with st.spinner('🔄 Migrating campaigns to Taboola...'):
+            uploaded_campaigns = st.session_state.uploaded_campaigns
+            
+            # Use the migration module directly
+            migration_module = st.session_state.conversation_manager.migration_module
+            report = migration_module.migrate_campaigns_from_file(
+                source_platform=uploaded_campaigns['platform'],
+                file_data=uploaded_campaigns['data']
+            )
+            
+            # Format and display results
+            response_generator = st.session_state.conversation_manager.response_generator
+            migration_message = response_generator.format_migration_report(report)
+            
+            # Add migration result to messages
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": f"File Migration Complete!\n\n{migration_message}"
+            })
+            
+            # Show summary
+            st.success(f"✅ Migration completed! {len(report.successes)} successful, {len(report.failures)} failed")
+            
+            # Clear uploaded campaigns
+            del st.session_state.uploaded_campaigns
+            
+    except Exception as e:
+        error_msg = f"Migration failed: {str(e)}"
+        logging.error(error_msg)
+        st.error(error_msg)
+
+
 def handle_user_message(user_input):
     """Handle user input and get AI response."""
     if not user_input.strip():
@@ -166,6 +282,41 @@ def main():
         
         st.divider()
         
+        # File upload section for migration
+        if selected_task == 'migration':
+            st.header("📁 File Upload")
+            
+            # Platform selection for file upload
+            platform_options = {
+                'facebook': '📘 Facebook',
+                'twitter': '🐦 Twitter'
+            }
+            
+            selected_platform = st.selectbox(
+                "Source Platform:",
+                options=list(platform_options.keys()),
+                format_func=lambda x: platform_options[x]
+            )
+            
+            # File upload
+            uploaded_file = st.file_uploader(
+                "Upload Campaign Data",
+                type=['csv', 'json', 'xlsx', 'xls'],
+                help="Upload your campaign data in CSV, JSON, or Excel format"
+            )
+            
+            if uploaded_file is not None:
+                if st.button("🚀 Process File", type="primary", use_container_width=True):
+                    handle_file_upload(uploaded_file, selected_platform)
+            
+            # Show sample format
+            with st.expander("📄 Sample Format"):
+                file_processor = FileProcessor()
+                sample = file_processor.get_sample_format(selected_platform)
+                st.json(sample)
+        
+        st.divider()
+        
         # Control buttons
         col1, col2 = st.columns(2)
         with col1:
@@ -218,7 +369,7 @@ def main():
         # Display chat messages
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
-                st.text(message["content"])
+                st.markdown(message["content"])
         
         # Chat input with Enter key support (no Send button needed!)
         if prompt := st.chat_input(
@@ -227,7 +378,7 @@ def main():
         ):
             # Display user message immediately
             with st.chat_message("user"):
-                st.text(prompt)
+                st.markdown(prompt)
             
             # Process the message
             handle_user_message(prompt)
@@ -238,7 +389,7 @@ def main():
                     if st.session_state.messages:
                         latest_message = st.session_state.messages[-1]
                         if latest_message["role"] == "assistant":
-                            st.text(latest_message["content"])
+                            st.markdown(latest_message["content"])
             
             st.rerun()
     
