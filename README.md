@@ -6,8 +6,8 @@ An AI-powered conversational application that helps advertisers optimize campaig
 
 - **Campaign Optimization**: Get data-driven suggestions for campaign settings based on historical Taboola data
 - **Cross-Platform Migration**: Transfer campaigns from Facebook and Twitter to Taboola with automated field mapping
-- **Conversational AI**: Natural language interaction powered by OpenAI GPT-4o-mini
-- **Multi-Interface Support**: Both command-line and web-based interfaces
+- **File Processing**: Upload and process campaign data from CSV, JSON, and Excel files with automatic validation
+- **Conversational AI**: Natural language interaction powered by OpenAI
 - **Real-Time Validation**: Immediate feedback on URLs, budgets, CPA values, and platform data
 
 ## Quick Start
@@ -24,11 +24,7 @@ An AI-powered conversational application that helps advertisers optimize campaig
    ```bash
    pip install -r requirements.txt
    ```
-3. Set up environment variables:
-   ```bash
-   cp .env.example .env
-   # Add your OPENAI_API_KEY to the .env file
-   ```
+3. Add your OPENAI_API_KEY to the .env file
 
 ### Running the Application
 
@@ -38,10 +34,6 @@ streamlit run streamlit_chat.py
 ```
 Open your browser to the displayed URL (typically http://localhost:8501)
 
-#### Command Line Interface
-```bash
-python chat_cli.py
-```
 
 ## Usage Examples
 
@@ -55,6 +47,11 @@ python chat_cli.py
 - "Transfer this Twitter campaign data"
 - "Convert my social media campaigns"
 
+### File Processing
+- Upload CSV, JSON, or Excel files containing campaign data
+- Automatic validation against platform-specific schemas
+- Schema comparison and issue reporting for data quality assurance
+
 ## Architecture
 
 ![Architecture Diagram](architecture.png)
@@ -63,6 +60,7 @@ The application follows a modular architecture with these core components:
 
 - **Conversation Manager**: Orchestrates AI conversations with function calling
 - **Data Processor**: Validates and processes user inputs
+- **File Processor**: Handles file uploads and processes campaign data from CSV, JSON, and Excel formats
 - **Optimization Engine**: Provides campaign suggestions based on historical data
 - **Migration Module**: Handles cross-platform campaign transfers
 - **Error Handler**: Centralized error management with user-friendly messages
@@ -90,6 +88,7 @@ Key dependencies include:
 core/                     # Core business logic
   - conversation_manager/ # AI conversation orchestration
   - data_processor/      # Input validation and processing
+  - file_processor/      # File upload and campaign data processing
   - generator/           # AI response generation
   - optimization_engine/ # Campaign optimization logic
   - migration_module/    # Cross-platform migration
